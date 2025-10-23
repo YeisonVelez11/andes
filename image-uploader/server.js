@@ -360,8 +360,8 @@ app.post('/upload', async (req, res) => {
             uploadedAt: new Date(date + 'T00:00:00').toISOString() // Usar fecha de la campaña
           };
           
-          // Agregar tipo_visualización solo si es desktop y está definido
-          if (deviceType === 'desktop' && visualizationType) {
+          // Agregar tipo_visualización si está definido (desktop: A,B,C,D / mobile: A,B,C)
+          if (visualizationType) {
             imageData.tipo_visualizacion = visualizationType;
           }
           
@@ -379,7 +379,7 @@ app.post('/upload', async (req, res) => {
             campana = 'sin-carpeta';
           }
           campana += `-${deviceType}`;
-          if (deviceType === 'desktop' && visualizationType) {
+          if (visualizationType) {
             campana += `-${visualizationType}`;
           }
           imageData.campana = campana;
@@ -423,8 +423,8 @@ app.post('/upload', async (req, res) => {
             uploadedAt: new Date(date + 'T00:00:00').toISOString() // Usar fecha de la campaña
           };
           
-          // Agregar tipo_visualización solo si es desktop y está definido
-          if (deviceType === 'desktop' && visualizationType) {
+          // Agregar tipo_visualización si está definido (desktop: A,B,C,D / mobile: A,B,C)
+          if (visualizationType) {
             imageData.tipo_visualizacion = visualizationType;
           }
           
@@ -442,7 +442,7 @@ app.post('/upload', async (req, res) => {
             campana = 'sin-carpeta';
           }
           campana += `-${deviceType}`;
-          if (deviceType === 'desktop' && visualizationType) {
+          if (visualizationType) {
             campana += `-${visualizationType}`;
           }
           imageData.campana = campana;
@@ -899,9 +899,9 @@ app.post('/generate-screenshot', async (req, res) => {
           const baseUrl = `${protocol}://${host}`;
           
           const jsonDataForScraper = {
-            imagenLateral: null,
-            imagenAncho: null,
-            imagenTop: null,
+            imagenLateral: record.imagenLateral ? `${baseUrl}${record.imagenLateral}` : null,
+            imagenAncho: record.imagenAncho ? `${baseUrl}${record.imagenAncho}` : null,
+            imagenTop: record.imagenTop ? `${baseUrl}${record.imagenTop}` : null,
             itt: null,
             zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null
           };
@@ -909,7 +909,10 @@ app.post('/generate-screenshot', async (req, res) => {
           const currentDate = new Date().toISOString().split('T')[0];
           const targetDate = (dateToProcess < currentDate) ? dateToProcess : null;
           
-          const result = await scrapeLosAndes('mobile', targetFolderId, null, jsonDataForScraper, targetDate);
+          // Obtener tipo de visualización del record (A, B, C para mobile)
+          const visualizationType = record.tipo_visualizacion || null;
+          
+          const result = await scrapeLosAndes('mobile', targetFolderId, visualizationType, jsonDataForScraper, targetDate);
           allResults.mobile.push({
             ...result,
             recordIndex: i,

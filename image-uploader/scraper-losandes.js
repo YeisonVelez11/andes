@@ -753,6 +753,126 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             await new Promise(resolve => setTimeout(resolve, 3000));
             console.log('✅ Proceso de inserción de imágenes tipo D completado');
         }
+        
+        // ============================================================
+        // MOBILE - TIPO A: IMAGEN ANCHO
+        // ============================================================
+        if (isMobile && visualizationType === 'A') {
+            console.log('🖼️ Insertando imagen ancho para mobile tipo A...');
+            
+            // Buscar el elemento .simple-news-column-without-image--mobile y hacer scroll al top
+            const scrollPosition = await page.evaluate(() => {
+                const targetElement = document.querySelector('.simple-news-column-without-image--mobile');
+                if (!targetElement) {
+                    console.error('❌ No se encontró el elemento .simple-news-column-without-image--mobile');
+                    return null;
+                }
+                
+                const rect = targetElement.getBoundingClientRect();
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                // Scroll al top del elemento
+                return rect.top + scrollTop;
+            });
+            
+            if (scrollPosition !== null) {
+                console.log(`📜 Haciendo scroll a ${scrollPosition}px...`);
+                await page.evaluate((scrollPos) => {
+                    window.scrollTo(0, scrollPos);
+                }, scrollPosition);
+                
+                // Esperar a que se complete el scroll
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Insertar imagen ancho
+                const insertResult = await page.evaluate((data) => {
+                    return new Promise((resolve) => {
+                        const results = {
+                            ancho: { found: false, inserted: false, error: null, position: {} }
+                        };
+                        
+                        try {
+                            const targetElement = document.querySelector('.simple-news-column-without-image--mobile');
+                            
+                            if (!targetElement) {
+                                results.ancho.error = 'No se encontró el elemento .simple-news-column-without-image--mobile';
+                                resolve(results);
+                                return;
+                            }
+                            
+                            results.ancho.found = true;
+                            
+                            if (data.imagenAncho) {
+                                const imgAncho = document.createElement('img');
+                                imgAncho.src = data.imagenAncho;
+                                imgAncho.style.position = 'fixed';
+                                imgAncho.style.zIndex = '9999';
+                                imgAncho.style.maxWidth = '100%';
+                                imgAncho.style.height = 'auto';
+                                imgAncho.style.display = 'block';
+                                
+                                imgAncho.onload = function() {
+                                    // Obtener la altura natural de la imagen ancho
+                                    const imgHeight = this.naturalHeight;
+                                    
+                                    
+                                    // Obtener la posición del elemento target
+                                    const rect = targetElement.getBoundingClientRect();
+                                    
+                                    // Agregar margin-bottom al elemento usando la altura natural
+                                    targetElement.style.marginBottom = (imgHeight + 20) +'px';
+                                    
+                                    // Posicionar imagen: debajo del elemento desde el top de la imagen
+                                    this.style.left = '50%';
+                                    this.style.transform = 'translateX(-50%)';
+                                    this.style.top = (rect.bottom )+ 'px';
+                                    
+                                    // Agregar la imagen al DOM
+                                    document.body.appendChild(this);
+                                    
+                                    results.ancho.inserted = true;
+                                    results.ancho.position = {
+                                        left: this.style.left,
+                                        top: this.style.top,
+                                        marginBottom: imgHeight + 'px'
+                                    };
+                                    
+                                    console.log('✅ Imagen ancho insertada en mobile tipo A');
+                                    console.log('📏 Margin-bottom agregado al elemento:', imgHeight + 'px');
+                                    console.log('📍 Posición top de la imagen:', rect.bottom + 'px');
+                                    resolve(results);
+                                };
+                                
+                                imgAncho.onerror = function() {
+                                    results.ancho.error = 'Error al cargar imagen ancho';
+                                    console.error('❌ Error al cargar imagen ancho');
+                                    resolve(results);
+                                };
+                            } else {
+                                results.ancho.error = 'No hay imagen ancho en los datos';
+                                resolve(results);
+                            }
+                        } catch (error) {
+                            results.ancho.error = error.message;
+                            console.error('❌ Error insertando imagen ancho:', error);
+                            resolve(results);
+                        }
+                        
+                        // Timeout de seguridad
+                        setTimeout(() => {
+                            resolve(results);
+                        }, 5000);
+                    });
+                }, jsonData);
+                
+                console.log('📊 Resultado de inserción mobile tipo A:', JSON.stringify(insertResult, null, 2));
+                
+                // Esperar a que la imagen se cargue completamente
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                console.log('✅ Proceso de inserción mobile tipo A completado');
+            } else {
+                console.log('⚠️ No se pudo hacer scroll al elemento mobile');
+            }
+        }
 
         console.log('📸 Tomando screenshot...');
         
@@ -762,24 +882,29 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             fullPage: false // Solo la parte visible
         });
 
-        console.log('🎨 Procesando imagen con barra de Chrome...');
+        // Variable para el screenshot final
+        var finalScreenshot = screenshotBuffer;
         
-        // Obtener metadata del screenshot original
-        const screenshotMetadata = await sharp(screenshotBuffer).metadata();
-        const screenshotWidth = screenshotMetadata.width;
-        const screenshotHeight = screenshotMetadata.height;
-        
-        // Altura de la barra de Chrome
-        const chromeBarHeight = 248;
-        
-        // Ruta de la barra de Chrome
-        const chromeBarPath = path.join(__dirname, 'public', 'images', 'bar1.png');
-        
-        // Verificar que existe la imagen de la barra
-        if (!fs.existsSync(chromeBarPath)) {
-            console.warn('⚠️ No se encontró bar1.png, continuando sin barra...');
-            var finalScreenshot = screenshotBuffer;
-        } else {
+        // Solo agregar barra de Chrome para desktop
+        if (!isMobile) {
+            console.log('🎨 Procesando imagen con barra de Chrome...');
+            
+            // Obtener metadata del screenshot original
+            const screenshotMetadata = await sharp(screenshotBuffer).metadata();
+            const screenshotWidth = screenshotMetadata.width;
+            const screenshotHeight = screenshotMetadata.height;
+            
+            // Altura de la barra de Chrome
+            const chromeBarHeight = 248;
+            
+            // Ruta de la barra de Chrome
+            const chromeBarPath = path.join(__dirname, 'public', 'images', 'bar1.png');
+            
+            // Verificar que existe la imagen de la barra
+            if (!fs.existsSync(chromeBarPath)) {
+                console.warn('⚠️ No se encontró bar1.png, continuando sin barra...');
+                finalScreenshot = screenshotBuffer;
+            } else {
             // Generar fecha y hora en formato "Mié 22 de oct. 10:24 p.m."
             // Si hay targetDate (fecha pasada), usar esa fecha en lugar de la actual
             const dateToUse = targetDate ? new Date(targetDate + 'T00:00:00') : new Date();
@@ -869,6 +994,9 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             
             console.log('✅ Barra de Chrome con fecha y hora agregada al screenshot');
             console.log(`📐 Dimensiones finales: ${screenshotWidth}x${newHeight} (original: ${screenshotWidth}x${screenshotHeight})`);
+            }
+        } else {
+            console.log('📱 Mobile: sin barra de Chrome');
         }
 
         // Generar nombre de archivo con timestamp, tipo de dispositivo y visualización

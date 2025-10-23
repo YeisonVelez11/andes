@@ -136,12 +136,29 @@ function setupEventListeners() {
 function handleDeviceTypeChange(e) {
   currentDeviceType = e.target.value;
   
-  // Mostrar/ocultar opciones de visualización desktop
-  const desktopVisualizationOptions = document.getElementById('desktopVisualizationOptions');
-  if (currentDeviceType === 'desktop') {
-    desktopVisualizationOptions.style.display = 'block';
+  // Actualizar título del card de visualización
+  const visualizationCardTitle = document.getElementById('visualizationCardTitle');
+  const visualizationOptionD = document.getElementById('visualizationOptionD');
+  
+  if (currentDeviceType === 'mobile') {
+    // Cambiar título a Mobile
+    visualizationCardTitle.innerHTML = '<i class="material-icons left">smartphone</i>Tipo de Visualización (Mobile)';
+    
+    // Ocultar opción D (ITT)
+    visualizationOptionD.style.display = 'none';
+    
+    // Si D estaba seleccionado, cambiar a A
+    const selectedRadio = document.querySelector('input[name="visualizationType"]:checked');
+    if (selectedRadio && selectedRadio.value === 'D') {
+      document.querySelector('input[name="visualizationType"][value="A"]').checked = true;
+      currentVisualizationType = 'A';
+    }
   } else {
-    desktopVisualizationOptions.style.display = 'none';
+    // Cambiar título a Desktop
+    visualizationCardTitle.innerHTML = '<i class="material-icons left">view_module</i>Tipo de Visualización (Desktop)';
+    
+    // Mostrar opción D (ITT)
+    visualizationOptionD.style.display = 'block';
   }
   
   // Mostrar/ocultar sección de zócalo
@@ -194,13 +211,6 @@ function handleVisualizationTypeChange(e) {
 
 // Actualizar visibilidad de secciones según tipo de visualización
 function updateSectionVisibility() {
-  // Solo aplicar si es desktop
-  if (currentDeviceType !== 'desktop') {
-    // En mobile, mostrar todas las secciones excepto zócalo que se maneja aparte
-    showAllSections();
-    return;
-  }
-  
   // Obtener todas las secciones de imágenes
   const lateralSection = document.querySelector('#imagenLateral').closest('.row');
   const anchoSection = document.querySelector('#imagenAncho').closest('.row');
@@ -213,21 +223,36 @@ function updateSectionVisibility() {
   topSection.style.display = 'none';
   ittSection.style.display = 'none';
   
-  // Mostrar según tipo de visualización
-  switch(currentVisualizationType) {
-    case 'A': // Lateral y Ancho
-      lateralSection.style.display = 'block';
-      anchoSection.style.display = 'block';
-      break;
-    case 'B': // Solo Lateral
-      lateralSection.style.display = 'block';
-      break;
-    case 'C': // Solo Top
-      topSection.style.display = 'block';
-      break;
-    case 'D': // Solo ITT
-      ittSection.style.display = 'block';
-      break;
+  if (currentDeviceType === 'mobile') {
+    // Lógica para mobile
+    switch(currentVisualizationType) {
+      case 'A': // Solo Ancho
+        anchoSection.style.display = 'block';
+        break;
+      case 'B': // Solo Lateral
+        lateralSection.style.display = 'block';
+        break;
+      case 'C': // Solo Top
+        topSection.style.display = 'block';
+        break;
+    }
+  } else {
+    // Lógica para desktop
+    switch(currentVisualizationType) {
+      case 'A': // Lateral y Ancho
+        lateralSection.style.display = 'block';
+        anchoSection.style.display = 'block';
+        break;
+      case 'B': // Solo Lateral
+        lateralSection.style.display = 'block';
+        break;
+      case 'C': // Solo Top
+        topSection.style.display = 'block';
+        break;
+      case 'D': // Solo ITT
+        ittSection.style.display = 'block';
+        break;
+    }
   }
 }
 
@@ -489,10 +514,8 @@ async function handleFormSubmit(e) {
   // Agregar tipo de dispositivo
   formData.append('deviceType', currentDeviceType);
   
-  // Agregar tipo de visualización (solo para desktop)
-  if (currentDeviceType === 'desktop') {
-    formData.append('visualizationType', currentVisualizationType);
-  }
+  // Agregar tipo de visualización (desktop: A,B,C,D / mobile: A,B,C)
+  formData.append('visualizationType', currentVisualizationType);
   
   // Agregar opción de primer y último día
   formData.append('firstLastOnly', firstLastOnly);
