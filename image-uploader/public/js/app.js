@@ -899,13 +899,34 @@ async function loadImagesForDate(date) {
       const entryContent = document.createElement('div');
       entryContent.className = 'card-content';
       
+      // Determinar el nombre del tipo de visualización
+      const visualizationNames = {
+        'A': 'Lateral / Ancho',
+        'B': 'Lateral',
+        'C': 'Top',
+        'D': 'ITT'
+      };
+      
+      const visualizationType = entry.tipo_visualizacion || 'No especificado';
+      const visualizationName = visualizationNames[visualizationType] || visualizationType;
+      
       entryContent.innerHTML = `
         <span class="card-title">
-          Entrada #${index + 1} - ${entry.deviceType}
+          Entrada #${index + 1}
           <span class="grey-text" style="font-size: 0.9rem; font-weight: normal;">
             (${new Date(entry.uploadedAt).toLocaleString()})
           </span>
         </span>
+        <div style="margin-top: 10px; margin-bottom: 15px;">
+          <span class="chip blue white-text" style="display: inline-flex; align-items: center; gap: 5px;">
+            <i class="material-icons" style="font-size: 18px;">devices</i>
+            <span>${entry.deviceType || 'No especificado'}</span>
+          </span>
+          <span class="chip teal white-text" style="display: inline-flex; align-items: center; gap: 5px;">
+            <i class="material-icons" style="font-size: 18px;">view_module</i>
+            <span>Tipo ${visualizationType}: ${visualizationName}</span>
+          </span>
+        </div>
       `;
       
       const imagesRow = document.createElement('div');
@@ -1085,3 +1106,18 @@ if (generateScreenshotBtn) {
     }
   });
 }
+
+// Cargar imágenes del día actual al iniciar la página
+document.addEventListener('DOMContentLoaded', function() {
+  // Obtener fecha actual en formato YYYY-MM-DD
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const todayString = `${year}-${month}-${day}`;
+  
+  console.log('📅 Cargando imágenes del día actual:', todayString);
+  
+  // Cargar imágenes del día actual
+  loadImagesForDate(todayString);
+});

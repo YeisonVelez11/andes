@@ -3,7 +3,7 @@ body {
   display: flex;
   min-height: 100vh;
   flex-direction: column;
-  background-color: #f5f5f5;
+  background: linear-gradient(to bottom, #fef5fb 0%, #ffffff 100%);
 }
 
 main {
@@ -21,18 +21,17 @@ nav {
   line-height: 64px;
 }
 
-nav .brand-logo {
-  display: flex;
-  align-items: center;
-  padding-left: 15px;
-  height: 64px;
-  line-height: normal;
-  font-size: 1.5rem;
+nav .container {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
-nav .brand-logo i {
-  margin-right: 10px;
-  line-height: 64px;
+nav .brand-logo {
+  line-height: normal;
+}
+
+nav .brand-logo img {
+  display: block;
 }
 
 /* Cards */
@@ -256,14 +255,14 @@ label {
 
 [type="radio"]:checked + span:after,
 [type="radio"].with-gap:checked + span:after {
-  background-color: #2196f3;
-  border: 2px solid #2196f3;
+  background-color: #E91E8C;
+  border: 2px solid #E91E8C;
 }
 
 [type="radio"]:checked + span:after,
 [type="radio"].with-gap:checked + span:before,
 [type="radio"].with-gap:checked + span:after {
-  border: 2px solid #2196f3;
+  border: 2px solid #E91E8C;
 }
 
 /* Sección de zócalo destacada */
@@ -295,35 +294,35 @@ label {
 .flatpickr-day.selected,
 .flatpickr-day.startRange,
 .flatpickr-day.endRange {
-  background: #2196f3;
-  border-color: #2196f3;
+  background: #E91E8C;
+  border-color: #E91E8C;
 }
 
 .flatpickr-day.selected:hover,
 .flatpickr-day.startRange:hover,
 .flatpickr-day.endRange:hover {
-  background: #1976d2;
-  border-color: #1976d2;
+  background: #d11a7d;
+  border-color: #d11a7d;
 }
 
 .flatpickr-day.inRange {
-  background: #bbdefb;
-  border-color: #bbdefb;
+  background: #fce4f2;
+  border-color: #fce4f2;
   box-shadow: none;
 }
 
 .flatpickr-months .flatpickr-month {
-  background: #2196f3;
+  background: linear-gradient(135deg, #E91E8C 0%, #6B2D8F 100%);
   color: white;
 }
 
 .flatpickr-current-month .flatpickr-monthDropdown-months {
-  background: #2196f3;
+  background: #E91E8C;
   color: white;
 }
 
 .flatpickr-weekday {
-  color: #2196f3;
+  color: #E91E8C;
   font-weight: 500;
 }
 
@@ -336,8 +335,8 @@ label {
 }
 
 .datepicker-range:focus {
-  border-bottom: 2px solid #2196f3 !important;
-  box-shadow: 0 1px 0 0 #2196f3 !important;
+  border-bottom: 2px solid #E91E8C !important;
+  box-shadow: 0 1px 0 0 #E91E8C !important;
 }
 
 /* Contenedor de fechas seleccionadas */
