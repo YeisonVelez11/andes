@@ -853,16 +853,14 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             finalScreenshot,
             'image/png'
         );
-
         console.log(`✅ Screenshot subido a Google Drive exitosamente!`);
         console.log(`📁 Drive ID: ${driveFile.id}`);
         console.log(`🔗 Link: ${driveFile.webViewLink}`);
 
-        const result = {
+        return {
             success: true,
             deviceType: deviceType,
             fileName: fileName,
-            localPath: localPath,
             driveId: driveFile.id,
             driveLink: driveFile.webViewLink
         };

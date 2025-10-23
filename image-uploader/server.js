@@ -179,8 +179,8 @@ function generateDateRange(startDate, endDate) {
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
-// COMENTADO: Ya no se guardan screenshots localmente
-// app.use('/screenshots', express.static('screenshots'));
+// Servir carpeta screenshots para las imágenes de preview en el HTML
+app.use('/screenshots', express.static('screenshots'));
 
 // ============================================================
 // CONFIGURACIÓN DE MULTER - ALMACENAMIENTO EN MEMORIA
@@ -303,6 +303,10 @@ app.post('/upload', async (req, res) => {
     // Obtener el tipo de visualización (solo para desktop)
     const visualizationType = req.body.visualizationType || null;
 
+    // Obtener información de la carpeta seleccionada
+    const selectedFolderId = req.body.selectedFolderId || null;
+    const selectedFolderName = req.body.selectedFolderName || null;
+
     // Obtener rangos de fechas del body
     const dateRange1 = req.body.dateRange1 ? JSON.parse(req.body.dateRange1) : null;
     const dateRange2 = req.body.dateRange2 ? JSON.parse(req.body.dateRange2) : null;
@@ -350,6 +354,25 @@ app.post('/upload', async (req, res) => {
             imageData.tipo_visualizacion = visualizationType;
           }
           
+          // Agregar información de la carpeta seleccionada
+          if (selectedFolderId && selectedFolderName) {
+            imageData.carpeta_id = selectedFolderId;
+            imageData.carpeta_nombre = selectedFolderName;
+          }
+          
+          // Generar campo campaña: nombreCarpeta-deviceType-variacion
+          let campana = '';
+          if (selectedFolderName) {
+            campana = selectedFolderName;
+          } else {
+            campana = 'sin-carpeta';
+          }
+          campana += `-${deviceType}`;
+          if (deviceType === 'desktop' && visualizationType) {
+            campana += `-${visualizationType}`;
+          }
+          imageData.campana = campana;
+          
           // Agregar al array
           jsonData.push(imageData);
           
@@ -394,6 +417,25 @@ app.post('/upload', async (req, res) => {
             imageData.tipo_visualizacion = visualizationType;
           }
           
+          // Agregar información de la carpeta seleccionada
+          if (selectedFolderId && selectedFolderName) {
+            imageData.carpeta_id = selectedFolderId;
+            imageData.carpeta_nombre = selectedFolderName;
+          }
+          
+          // Generar campo campaña: nombreCarpeta-deviceType-variacion
+          let campana = '';
+          if (selectedFolderName) {
+            campana = selectedFolderName;
+          } else {
+            campana = 'sin-carpeta';
+          }
+          campana += `-${deviceType}`;
+          if (deviceType === 'desktop' && visualizationType) {
+            campana += `-${visualizationType}`;
+          }
+          imageData.campana = campana;
+          
           // Agregar al array
           jsonData.push(imageData);
           
@@ -407,6 +449,7 @@ app.post('/upload', async (req, res) => {
       }
     }
 
+    // Responder con éxito
     res.json({
       success: true,
       message: 'Imágenes subidas a Google Drive correctamente',
@@ -444,6 +487,75 @@ app.get('/uploads', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Error al obtener archivos de Google Drive'
+    });
+  }
+});
+
+// Endpoint para listar carpetas de Google Drive
+app.get('/folders', async (req, res) => {
+  if (!driveClient) {
+    return res.status(500).json({
+      success: false,
+      error: 'Google Drive no está configurado'
+    });
+  }
+
+  try {
+    const parentId = req.query.parentId || '1itJ-0q38UJ1hQTbck-qL7du9f-qnLm4z'; // Carpeta raíz por defecto
+    
+    const response = await driveClient.files.list({
+      q: `'${parentId}' in parents and trashed=false and mimeType='application/vnd.google-apps.folder'`,
+      fields: 'files(id, name, mimeType, modifiedTime)',
+      orderBy: 'name asc',
+      pageSize: 100
+    });
+
+    // Filtrar carpetas excluidas (imagenes, jsones, screenshots)
+    const excludedFolders = ['imagenes', 'jsones', 'screenshots'];
+    const filteredFolders = response.data.files.filter(folder => 
+      !excludedFolders.includes(folder.name.toLowerCase())
+    );
+
+    res.json({
+      success: true,
+      folders: filteredFolders,
+      parentId: parentId
+    });
+  } catch (error) {
+    console.error('Error al listar carpetas de Drive:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener carpetas de Google Drive'
+    });
+  }
+});
+
+// Endpoint para obtener información de una carpeta específica
+app.get('/folder-info/:folderId', async (req, res) => {
+  if (!driveClient) {
+    return res.status(500).json({
+      success: false,
+      error: 'Google Drive no está configurado'
+    });
+  }
+
+  try {
+    const folderId = req.params.folderId;
+    
+    const response = await driveClient.files.get({
+      fileId: folderId,
+      fields: 'id, name, parents'
+    });
+
+    res.json({
+      success: true,
+      folder: response.data
+    });
+  } catch (error) {
+    console.error('Error al obtener información de carpeta:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener información de carpeta'
     });
   }
 });
@@ -591,7 +703,12 @@ app.post('/generate-screenshot', async (req, res) => {
         const record = desktopRecords[i];
         const visualizationType = record.tipo_visualizacion || 'A';
         
+        // Obtener carpeta de destino del registro (si existe)
+        const targetFolderId = record.carpeta_id || capturas;
+        const targetFolderName = record.carpeta_nombre || 'capturas (default)';
+        
         console.log(`\n🎬 Generando screenshot ${i + 1}/${desktopRecords.length} - Tipo: ${visualizationType}`);
+        console.log(`📁 Carpeta destino: ${targetFolderName} (ID: ${targetFolderId})`);
         
         try {
           // Preparar datos del JSON con URLs completas de Drive
@@ -605,7 +722,7 @@ app.post('/generate-screenshot', async (req, res) => {
           
           console.log('📄 URLs de imágenes preparadas:', jsonDataForScraper);
           
-          const result = await scrapeLosAndes(deviceType, capturas, visualizationType, jsonDataForScraper);
+          const result = await scrapeLosAndes(deviceType, targetFolderId, visualizationType, jsonDataForScraper);
           results.push({
             ...result,
             visualizationType: visualizationType,

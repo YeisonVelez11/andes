@@ -59,6 +59,12 @@ let currentDisplayDate = new Date().toISOString().split('T')[0];
 let showImages = false; // Por defecto deshabilitado
 let collapsibleInstance = null;
 
+// Variables para el selector de carpetas
+let folderNavigationStack = [];
+let currentFolderId = '1itJ-0q38UJ1hQTbck-qL7du9f-qnLm4z'; // Carpeta raíz
+let selectedFolderId = null;
+let selectedFolderName = null;
+
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
   // Inicializar Materialize
@@ -81,6 +87,9 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Configurar checkbox de primer y último día
   setupFirstLastOnlyCheckbox();
+  
+  // Cargar carpetas iniciales
+  loadFolders(currentFolderId);
   
   // NO cargar imágenes por defecto (checkbox desmarcado)
   
@@ -470,6 +479,12 @@ async function handleFormSubmit(e) {
   // Agregar opción de primer y último día
   formData.append('firstLastOnly', firstLastOnly);
   
+  // Agregar información de carpeta seleccionada
+  if (selectedFolderId && selectedFolderName) {
+    formData.append('selectedFolderId', selectedFolderId);
+    formData.append('selectedFolderName', selectedFolderName);
+  }
+  
   // Agregar rango de fechas
   formData.append('dateRange1', JSON.stringify({
     start: dateRange.start.toISOString().split('T')[0],
@@ -821,13 +836,46 @@ async function loadImagesForDateRange(startDate, endDate) {
         const entryContent = document.createElement('div');
         entryContent.className = 'card-content';
         
+        // Determinar el nombre del tipo de visualización
+        const visualizationNames = {
+          'A': 'Lateral / Ancho',
+          'B': 'Lateral',
+          'C': 'Top',
+          'D': 'ITT'
+        };
+        
+        const visualizationType = entry.tipo_visualizacion || 'No especificado';
+        const visualizationName = visualizationNames[visualizationType] || visualizationType;
+        
         entryContent.innerHTML = `
           <span class="card-title">
-            Entrada #${index + 1} - ${entry.deviceType}
+            Entrada #${index + 1}
             <span class="grey-text" style="font-size: 0.9rem; font-weight: normal;">
               (${new Date(entry.uploadedAt).toLocaleString()})
             </span>
           </span>
+          <div style="margin-top: 10px; margin-bottom: 15px;">
+            ${entry.campana ? `
+              <span class="chip orange white-text" style="display: inline-flex; align-items: center; gap: 5px;">
+                <i class="material-icons" style="font-size: 18px;">campaign</i>
+                <span><strong>Campaña:</strong> ${entry.campana}</span>
+              </span>
+            ` : ''}
+            ${entry.carpeta_nombre ? `
+              <span class="chip purple white-text" style="display: inline-flex; align-items: center; gap: 5px;">
+                <i class="material-icons" style="font-size: 18px;">folder</i>
+                <span><strong>Carpeta:</strong> ${entry.carpeta_nombre}</span>
+              </span>
+            ` : ''}
+            <span class="chip blue white-text" style="display: inline-flex; align-items: center; gap: 5px;">
+              <i class="material-icons" style="font-size: 18px;">devices</i>
+              <span>${entry.deviceType || 'No especificado'}</span>
+            </span>
+            <span class="chip teal white-text" style="display: inline-flex; align-items: center; gap: 5px;">
+              <i class="material-icons" style="font-size: 18px;">view_module</i>
+              <span>Tipo ${visualizationType}: ${visualizationName}</span>
+            </span>
+          </div>
         `;
         
         const imagesRow = document.createElement('div');
@@ -976,6 +1024,18 @@ async function loadImagesForDate(date) {
           </span>
         </span>
         <div style="margin-top: 10px; margin-bottom: 15px;">
+          ${entry.campana ? `
+            <span class="chip orange white-text" style="display: inline-flex; align-items: center; gap: 5px;">
+              <i class="material-icons" style="font-size: 18px;">campaign</i>
+              <span><strong>Campaña:</strong> ${entry.campana}</span>
+            </span>
+          ` : ''}
+          ${entry.carpeta_nombre ? `
+            <span class="chip purple white-text" style="display: inline-flex; align-items: center; gap: 5px;">
+              <i class="material-icons" style="font-size: 18px;">folder</i>
+              <span><strong>Carpeta:</strong> ${entry.carpeta_nombre}</span>
+            </span>
+          ` : ''}
           <span class="chip blue white-text" style="display: inline-flex; align-items: center; gap: 5px;">
             <i class="material-icons" style="font-size: 18px;">devices</i>
             <span>${entry.deviceType || 'No especificado'}</span>
@@ -1163,6 +1223,116 @@ if (generateScreenshotBtn) {
       screenshotLoading.style.display = 'none';
     }
   });
+}
+
+// ============================================================
+// FUNCIONES PARA SELECTOR DE CARPETAS
+// ============================================================
+
+// Cargar carpetas de Google Drive
+async function loadFolders(parentId) {
+  const folderList = document.getElementById('folderList');
+  const breadcrumb = document.getElementById('folderBreadcrumb');
+  
+  // Mostrar loading
+  folderList.innerHTML = `
+    <div class="center-align">
+      <div class="preloader-wrapper small active">
+        <div class="spinner-layer spinner-orange-only">
+          <div class="circle-clipper left"><div class="circle"></div></div>
+          <div class="gap-patch"><div class="circle"></div></div>
+          <div class="circle-clipper right"><div class="circle"></div></div>
+        </div>
+      </div>
+      <p class="grey-text">Cargando carpetas...</p>
+    </div>
+  `;
+  
+  try {
+    const response = await fetch(`/folders?parentId=${parentId}`);
+    const data = await response.json();
+    
+    if (data.success) {
+      currentFolderId = parentId;
+      renderFolders(data.folders);
+      updateBreadcrumb();
+    } else {
+      folderList.innerHTML = `<p class="red-text center-align">Error: ${data.error}</p>`;
+    }
+  } catch (error) {
+    console.error('Error al cargar carpetas:', error);
+    folderList.innerHTML = `<p class="red-text center-align">Error al cargar carpetas</p>`;
+  }
+}
+
+// Renderizar lista de carpetas
+function renderFolders(folders) {
+  const folderList = document.getElementById('folderList');
+  
+  if (folders.length === 0) {
+    folderList.innerHTML = '<p class="grey-text center-align">No hay subcarpetas</p>';
+    return;
+  }
+  
+  let html = '<ul class="collection" style="margin: 0; border: none;">';
+  
+  folders.forEach(folder => {
+    html += `
+      <li class="collection-item" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" data-folder-id="${folder.id}" data-folder-name="${folder.name}">
+        <div style="flex: 1;" onclick="openFolder('${folder.id}', '${folder.name.replace(/'/g, "\\'")}')">
+          <i class="material-icons" style="vertical-align: middle; color: #FF9800;">folder</i>
+          <span style="margin-left: 10px;">${folder.name}</span>
+        </div>
+        <button class="btn-small orange" onclick="selectFolder('${folder.id}', '${folder.name.replace(/'/g, "\\'")}'); event.stopPropagation();">
+          <i class="material-icons">check</i>
+        </button>
+      </li>
+    `;
+  });
+  
+  html += '</ul>';
+  folderList.innerHTML = html;
+}
+
+// Abrir carpeta (navegar hacia adentro)
+function openFolder(folderId, folderName) {
+  folderNavigationStack.push({ id: currentFolderId, name: folderName });
+  loadFolders(folderId);
+}
+
+// Volver a la carpeta anterior
+function goBack() {
+  if (folderNavigationStack.length > 0) {
+    const previous = folderNavigationStack.pop();
+    loadFolders(previous.id);
+  }
+}
+
+// Seleccionar carpeta
+function selectFolder(folderId, folderName) {
+  selectedFolderId = folderId;
+  selectedFolderName = folderName;
+  
+  // Actualizar UI
+  document.getElementById('selectedFolderId').value = folderId;
+  document.getElementById('selectedFolderName').textContent = folderName;
+  document.getElementById('selectedFolder').style.display = 'block';
+  
+  M.toast({ html: `Carpeta seleccionada: ${folderName}`, classes: 'orange' });
+}
+
+// Actualizar breadcrumb de navegación
+function updateBreadcrumb() {
+  const breadcrumb = document.getElementById('folderBreadcrumb');
+  
+  let html = '<i class="material-icons tiny" style="vertical-align: middle; cursor: pointer;" onclick="loadFolders(\'1itJ-0q38UJ1hQTbck-qL7du9f-qnLm4z\'); folderNavigationStack = [];">home</i>';
+  
+  if (folderNavigationStack.length > 0) {
+    html += ' <i class="material-icons tiny" style="vertical-align: middle;">chevron_right</i> ';
+    html += '<a href="#" onclick="goBack(); return false;" style="color: #FF9800;">Volver</a>';
+  }
+  
+  breadcrumb.innerHTML = html;
 }
 
 // Cargar imágenes del día actual al iniciar la página
