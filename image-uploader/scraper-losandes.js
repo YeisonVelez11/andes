@@ -304,7 +304,15 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                             imgAncho.onload = function() {
                                 results.ancho.inserted = true;
                                 results.ancho.position = { left: this.style.left, top: this.style.top };
+                                
+                                // Agregar margin-bottom al rowElement del tamaño de la imagen + 20px
+                                const imgHeight = this.height;
+                                const marginBottom = (imgHeight ) + 30;
+                                rowElement.style.marginBottom = marginBottom + 'px';
+                                
                                 console.log('✅ Imagen ancho insertada en:', this.style.left, this.style.top);
+                                console.log('📏 Margin-bottom agregado al elemento:', marginBottom + 'px', '(imagen:', imgHeight + 'px + 20px)');
+                                
                                 imagesLoaded++;
                                 checkComplete();
                             };
@@ -692,19 +700,13 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             const diaSemana = diasSemana[now.getDay()];
             const dia = now.getDate();
             const mes = meses[now.getMonth()];
-            let horas = now.getHours();
-            const minutos = String(now.getMinutes()).padStart(2, '0');
-            const periodo = horas >= 12 ? 'p.m.' : 'a.m.';
             
-            // Convertir a formato 12 horas
-            if (horas > 12) horas -= 12;
-            if (horas === 0) horas = 12;
-            
-            const fechaHora = `${diaSemana} ${dia} de ${mes}. ${horas}:${minutos} ${periodo}`;
-            console.log(`🕐 Fecha y hora: ${fechaHora}`);
+            // Solo fecha para la barra (sin hora)
+            const fecha = `${diaSemana} ${dia} de ${mes}.`;
+            console.log(`📅 Fecha para barra: ${fecha}`);
             
             // Escapar caracteres especiales para XML/SVG
-            const escapedFechaHora = fechaHora
+            const escapedFecha = fecha
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
@@ -751,7 +753,7 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             }
         </style>
     </defs>
-    <text x="${screenshotWidth - textPadding}" y="${textVerticalPosition}" class="datetime" text-anchor="end">${escapedFechaHora}</text>
+    <text x="${screenshotWidth - textPadding}" y="${textVerticalPosition}" class="datetime" text-anchor="end">${escapedFecha}</text>
 </svg>`;
             
             const textOverlay = Buffer.from(svgText);
