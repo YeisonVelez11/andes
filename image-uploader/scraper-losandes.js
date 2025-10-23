@@ -252,6 +252,9 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                     
                     // Insertar imagen lateral si existe
                     if (data.imagenLateral && refRect) {
+                        // Buscar el elemento de referencia para posicionamiento
+                        const targetElement = document.querySelector('.simple-news-column-without-image.simple-news-column-without-image--with-title');
+                        
                         const imgLateral = document.createElement('img');
                         imgLateral.crossOrigin = 'anonymous';
                         imgLateral.src = data.imagenLateral;
@@ -261,8 +264,20 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                         imgLateral.id = 'inserted-imagen-lateral';
                         
                         imgLateral.onload = function() {
-                            const imgHeight = this.height;
-                            const topPosition = navbarHeight + (availableHeight - imgHeight) / 2 + window.scrollY;
+                            let topPosition;
+                            
+                            if (targetElement) {
+                                // Posicionar a 5px del bottom del elemento target
+                                const targetRect = targetElement.getBoundingClientRect();
+                                topPosition = targetRect.bottom + 5 + window.scrollY;
+                                console.log('✅ Elemento target encontrado, posicionando a 5px de su bottom');
+                            } else {
+                                // Fallback: centrado vertical (comportamiento anterior)
+                                const imgHeight = this.height;
+                                topPosition = navbarHeight + (availableHeight - imgHeight) / 2 + window.scrollY;
+                                console.log('⚠️ Elemento target no encontrado, usando posición centrada');
+                            }
+                            
                             this.style.top = topPosition + 'px';
                             results.lateral.inserted = true;
                             results.lateral.position = { left: this.style.left, top: this.style.top };
