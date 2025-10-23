@@ -56,12 +56,19 @@ let currentVisualizationType = 'A'; // A, B, C, D
 let uploadedFiles = {};
 let dateRange = { start: null, end: null };
 let currentDisplayDate = new Date().toISOString().split('T')[0];
-let showImages = true;
+let showImages = false; // Por defecto deshabilitado
+let collapsibleInstance = null;
 
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
   // Inicializar Materialize
   M.AutoInit();
+  
+  // Inicializar collapsible
+  const collapsibleElem = document.querySelector('.collapsible');
+  collapsibleInstance = M.Collapsible.init(collapsibleElem, {
+    accordion: false
+  });
   
   // Configurar event listeners
   setupEventListeners();
@@ -72,10 +79,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // Configurar checkbox de mostrar/ocultar imágenes
   setupImageToggle();
   
-  // Cargar imágenes del día actual solo si el checkbox está marcado
-  if (showImages) {
-    loadImagesForDate(currentDisplayDate);
-  }
+  // Configurar checkbox de primer y último día
+  setupFirstLastOnlyCheckbox();
+  
+  // NO cargar imágenes por defecto (checkbox desmarcado)
   
   // Mostrar toast de bienvenida
   M.toast({ html: '¡Bienvenido! Selecciona el tipo de dispositivo y carga tus imágenes.', classes: 'blue' });
@@ -441,6 +448,9 @@ async function handleFormSubmit(e) {
     return;
   }
 
+  // Verificar si solo se deben generar JSONs para primer y último día
+  const firstLastOnly = document.getElementById('firstLastOnly').checked;
+
   // Crear FormData
   const formData = new FormData();
   
@@ -456,6 +466,9 @@ async function handleFormSubmit(e) {
   if (currentDeviceType === 'desktop') {
     formData.append('visualizationType', currentVisualizationType);
   }
+  
+  // Agregar opción de primer y último día
+  formData.append('firstLastOnly', firstLastOnly);
   
   // Agregar rango de fechas
   formData.append('dateRange1', JSON.stringify({
@@ -607,14 +620,26 @@ function initializeDateRangePickers() {
 // Actualizar la visualización de las fechas seleccionadas
 function updateSelectedDatesDisplay() {
   const container = document.getElementById('selectedDates');
+  const firstLastOnly = document.getElementById('firstLastOnly').checked;
   let html = '';
 
   if (dateRange.start && dateRange.end) {
-    html = `<p><strong>Rango Seleccionado:</strong><br>
-      <i class="material-icons tiny">calendar_today</i> 
-      ${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}
-      <span class="grey-text">(${getDaysDifference(dateRange.start, dateRange.end)} día${getDaysDifference(dateRange.start, dateRange.end) > 1 ? 's' : ''})</span>
-    </p>`;
+    const totalDays = getDaysDifference(dateRange.start, dateRange.end);
+    const daysText = totalDays > 1 ? 's' : '';
+    
+    if (firstLastOnly && totalDays > 1) {
+      html = `<p><strong>Fechas Seleccionadas:</strong><br>
+        <i class="material-icons tiny">calendar_today</i> 
+        ${formatDate(dateRange.start)} y ${formatDate(dateRange.end)}
+        <br><span class="grey-text"><small>Se generarán JSONs solo para estos 2 días</small></span>
+      </p>`;
+    } else {
+      html = `<p><strong>Rango Seleccionado:</strong><br>
+        <i class="material-icons tiny">calendar_today</i> 
+        ${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}
+        <span class="grey-text">(${totalDays} día${daysText})</span>
+      </p>`;
+    }
   } else {
     html = '<p class="grey-text text-darken-2"><small>El rango de fechas seleccionado aparecerá aquí</small></p>';
   }
@@ -635,18 +660,42 @@ function getDaysDifference(start, end) {
   return diffDays;
 }
 
+// Configurar checkbox de primer y último día
+function setupFirstLastOnlyCheckbox() {
+  const checkbox = document.getElementById('firstLastOnly');
+  if (checkbox) {
+    checkbox.addEventListener('change', function() {
+      // Actualizar el display de fechas seleccionadas
+      updateSelectedDatesDisplay();
+      
+      // Mostrar mensaje informativo
+      if (this.checked && dateRange.start && dateRange.end) {
+        const totalDays = getDaysDifference(dateRange.start, dateRange.end);
+        if (totalDays > 1) {
+          M.toast({ 
+            html: 'Se generarán JSONs solo para el primer y último día seleccionado', 
+            classes: 'blue' 
+          });
+        }
+      }
+    });
+  }
+}
+
 // Configurar checkbox de mostrar/ocultar imágenes
 function setupImageToggle() {
   const checkbox = document.getElementById('showImagesCheckbox');
   if (checkbox) {
     checkbox.addEventListener('change', function() {
       showImages = this.checked;
-      const gallery = document.getElementById('imageGallery');
       
       if (showImages) {
-        // Si se marca, cargar las imágenes
-        gallery.style.display = 'block';
+        // Expandir el collapsible
+        if (collapsibleInstance) {
+          collapsibleInstance.open(0);
+        }
         
+        // Cargar las imágenes
         // Determinar si cargar un día o un rango
         if (dateRange.start && dateRange.end) {
           const startDate = dateRange.start.toISOString().split('T')[0];
@@ -661,10 +710,19 @@ function setupImageToggle() {
           // Si no hay rango seleccionado, cargar fecha actual
           loadImagesForDate(currentDisplayDate);
         }
+        
+        M.toast({ html: 'Cargando imágenes...', classes: 'blue' });
       } else {
-        // Si se desmarca, ocultar y limpiar
-        gallery.style.display = 'none';
+        // Cerrar el collapsible
+        if (collapsibleInstance) {
+          collapsibleInstance.close(0);
+        }
+        
+        // Limpiar galería
+        const gallery = document.getElementById('imageGallery');
         gallery.innerHTML = '<div class="col s12 center-align"><p class="grey-text">Marca el checkbox para mostrar las imágenes</p></div>';
+        
+        M.toast({ html: 'Galería cerrada', classes: 'grey' });
       }
     });
   }

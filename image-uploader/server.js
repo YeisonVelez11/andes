@@ -294,12 +294,21 @@ app.post('/upload', async (req, res) => {
     // Obtener rangos de fechas del body
     const dateRange1 = req.body.dateRange1 ? JSON.parse(req.body.dateRange1) : null;
     const dateRange2 = req.body.dateRange2 ? JSON.parse(req.body.dateRange2) : null;
+    const firstLastOnly = req.body.firstLastOnly === 'true';
 
     // Procesar rangos de fechas y crear/actualizar archivos JSON
     const jsonResults = [];
     
     if (dateRange1 && dateRange1.start && dateRange1.end) {
-      const dates1 = generateDateRange(dateRange1.start, dateRange1.end);
+      let dates1;
+      
+      if (firstLastOnly) {
+        // Solo el primer y último día del rango
+        dates1 = [dateRange1.start, dateRange1.end];
+      } else {
+        // Todos los días en el rango
+        dates1 = generateDateRange(dateRange1.start, dateRange1.end);
+      }
       for (const date of dates1) {
         try {
           const jsonFileName = `${date}.json`;

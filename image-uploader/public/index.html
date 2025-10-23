@@ -21,14 +21,15 @@
 <body>
   <nav style="background: linear-gradient(135deg, #E91E8C 0%, #6B2D8F 100%);">
     <div class="nav-wrapper container">
-      <a href="#" class="brand-logo center">
-        <img src="/images/nontrad.png" alt="nontrad" style="height: 50px; margin-top: 7px; margin-bottom: 7px;">
+      <a href="#" class="brand-logo" style="display: flex; align-items: center; gap: 15px;">
+        <img src="/images/nontrad.png" alt="nontrad" style="height: 45px;">
       </a>
     </div>
   </nav>
 
   <div class="container">
     <div class="section">
+      <h5 class="center-align">Certificaciones Publicitarias</h5>
       
       <!-- Selector de Dispositivo y Rangos de Fecha -->
       <div class="row">
@@ -104,50 +105,18 @@
               <div class="input-field">
                 <i class="material-icons prefix">event</i>
                 <input type="text" id="dateRange" class="datepicker-range" placeholder="Selecciona rango de fechas">
-                <label for="dateRange">Rango de Fechas</label>
               </div>
+              
+              <p style="margin-top: 15px;">
+                <label>
+                  <input type="checkbox" id="firstLastOnly" />
+                  <span>Primer y último día solamente</span>
+                </label>
+              </p>
               
               <div id="selectedDates" style="margin-top: 10px;">
                 <p class="grey-text text-darken-2"><small>El rango de fechas seleccionado aparecerá aquí</small></p>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Botón Generar Screenshot -->
-      <div class="row">
-        <div class="col s12">
-          <div class="card purple lighten-5">
-            <div class="card-content">
-              <span class="card-title">
-                <i class="material-icons left">camera_alt</i>
-                Captura de Pantalla Los Andes
-              </span>
-              <p class="grey-text">Genera un screenshot de la página de Los Andes con el tipo de dispositivo seleccionado arriba.</p>
-              <div class="center-align" style="margin-top: 15px;">
-                <button id="generateScreenshotBtn" class="btn-large waves-effect waves-light purple darken-2">
-                  <i class="material-icons left">camera</i>
-                  Generar Screenshot
-                </button>
-              </div>
-              <div id="screenshotLoading" class="center-align" style="display: none; margin-top: 20px;">
-                <div class="preloader-wrapper small active">
-                  <div class="spinner-layer spinner-purple-only">
-                    <div class="circle-clipper left">
-                      <div class="circle"></div>
-                    </div>
-                    <div class="gap-patch">
-                      <div class="circle"></div>
-                    </div>
-                    <div class="circle-clipper right">
-                      <div class="circle"></div>
-                    </div>
-                  </div>
-                </div>
-                <p class="purple-text">Generando screenshot... Esto puede tomar unos segundos</p>
-              </div>
-              <div id="screenshotResult" style="margin-top: 15px;"></div>
             </div>
           </div>
         </div>
@@ -332,32 +301,73 @@
       <!-- Galería de Imágenes del Día -->
       <div class="row">
         <div class="col s12">
-          <div class="card">
-            <div class="card-content">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <span class="card-title" style="margin: 0;">
-                  <i class="material-icons left">photo_library</i>
-                  Imágenes del Día
-                </span>
-                <label>
-                  <input type="checkbox" id="showImagesCheckbox" checked />
+          <ul class="collapsible">
+            <li>
+              <div class="collapsible-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <i class="material-icons">photo_library</i>
+                  Galería de Imágenes del Día
+                </div>
+                <label style="margin-right: 10px;" onclick="event.stopPropagation();">
+                  <input type="checkbox" id="showImagesCheckbox" />
                   <span>Mostrar imágenes</span>
                 </label>
               </div>
-              
-              <div id="currentDateDisplay" style="margin-bottom: 15px;">
-                <p class="grey-text">
-                  <i class="material-icons tiny" style="vertical-align: middle;">today</i>
-                  <strong>Fecha actual:</strong> <span id="displayDate"></span>
-                </p>
-              </div>
-              
-              <div id="imageGallery" class="row">
-                <div class="col s12 center-align">
-                  <p class="grey-text">Selecciona una fecha para ver las imágenes</p>
+              <div class="collapsible-body">
+                <div id="currentDateDisplay" style="margin-bottom: 15px;">
+                  <p class="grey-text">
+                    <i class="material-icons tiny" style="vertical-align: middle;">today</i>
+                    <strong>Fecha actual:</strong> <span id="displayDate"></span>
+                  </p>
+                </div>
+                
+                <div id="imageGallery" class="row">
+                  <div class="col s12 center-align">
+                    <p class="grey-text">Selecciona una fecha para ver las imágenes</p>
+                  </div>
                 </div>
               </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botón Generar Screenshot -->
+  <div class="container">
+    <div class="row">
+      <div class="col s12">
+        <div class="card purple lighten-5">
+          <div class="card-content">
+            <span class="card-title">
+              <i class="material-icons left">camera_alt</i>
+              Captura de Pantalla Los Andes
+            </span>
+            <p class="grey-text">Genera un screenshot de la página de Los Andes con el tipo de dispositivo seleccionado arriba.</p>
+            <div class="center-align" style="margin-top: 15px;">
+              <button id="generateScreenshotBtn" class="btn-large waves-effect waves-light purple darken-2">
+                <i class="material-icons left">camera</i>
+                Generar Screenshot
+              </button>
             </div>
+            <div id="screenshotLoading" class="center-align" style="display: none; margin-top: 20px;">
+              <div class="preloader-wrapper small active">
+                <div class="spinner-layer spinner-purple-only">
+                  <div class="circle-clipper left">
+                    <div class="circle"></div>
+                  </div>
+                  <div class="gap-patch">
+                    <div class="circle"></div>
+                  </div>
+                  <div class="circle-clipper right">
+                    <div class="circle"></div>
+                  </div>
+                </div>
+              </div>
+              <p class="purple-text">Generando screenshot... Esto puede tomar unos segundos</p>
+            </div>
+            <div id="screenshotResult" style="margin-top: 15px;"></div>
           </div>
         </div>
       </div>
@@ -368,7 +378,7 @@
   <footer class="page-footer" style="background: linear-gradient(135deg, #E91E8C 0%, #6B2D8F 100%);">
     <div class="footer-copyright">
       <div class="container center-align">
-        © 2025 nontrad - Sistema de Carga de Imágenes Publicitarias
+        © 2025 Sistema de Carga de Imágenes Publicitarias
       </div>
     </div>
   </footer>
