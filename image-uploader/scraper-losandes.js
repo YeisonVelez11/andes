@@ -187,7 +187,41 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                     timeout: 30000
                 });
                 
+                // Esperar a que los estilos se apliquen
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Forzar aplicación de estilos mobile si es necesario
+                if (isMobile) {
+                    await page.evaluate(() => {
+                        // Forzar que el body tenga la clase mobile
+                        document.body.classList.add('home-mobile');
+                        document.body.classList.remove('home-desktop');
+                        
+                        // Ocultar elementos desktop y mostrar elementos mobile
+                        const desktopElements = document.querySelectorAll('[class*="--desktop"]');
+                        desktopElements.forEach(el => {
+                            el.style.display = 'none';
+                        });
+                        
+                        const mobileElements = document.querySelectorAll('[class*="--mobile"]');
+                        mobileElements.forEach(el => {
+                            el.style.display = '';
+                        });
+                        
+                        // Disparar evento resize
+                        window.dispatchEvent(new Event('resize'));
+                        // Forzar reflow
+                        document.body.offsetHeight;
+                    });
+                    
+                    console.log('🔄 Estilos mobile forzados en HTML histórico');
+                }
+                
+                // Esperar otro momento para que los cambios se apliquen
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
                 console.log('✅ HTML histórico cargado exitosamente');
+                console.log(`📱 Viewport configurado: ${isMobile ? 'Mobile' : 'Desktop'} (${viewportConfig.width}x${viewportConfig.height})`);
                 
             } catch (htmlError) {
                 console.error(`❌ Error cargando HTML histórico: ${htmlError.message}`);

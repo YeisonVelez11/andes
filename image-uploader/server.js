@@ -674,12 +674,15 @@ async function captureAndSaveHTML() {
     {
       name: 'desktop',
       fileName: `${today}_desktop.html`,
-      viewport: { width: 1920, height: 1080 }
+      viewport: { width: 1920, height: 1080 },
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     },
     {
       name: 'mobile',
       fileName: `${today}_mobile.html`,
-      viewport: { width: 400, height: 824 }
+      viewport: { width: 400, height: 824 },
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+      isMobile: true
     }
   ];
   
@@ -698,7 +701,23 @@ async function captureAndSaveHTML() {
       });
       
       const page = await browser.newPage();
-      await page.setViewport(config.viewport);
+      
+      // Configurar viewport con opciones mobile si aplica
+      if (config.isMobile) {
+        await page.setViewport({
+          width: config.viewport.width,
+          height: config.viewport.height,
+          deviceScaleFactor: 2,
+          isMobile: true,
+          hasTouch: true,
+          isLandscape: false
+        });
+      } else {
+        await page.setViewport(config.viewport);
+      }
+      
+      // Configurar user agent
+      await page.setUserAgent(config.userAgent);
       
       // Navegar a la página
       await page.goto(url, {
