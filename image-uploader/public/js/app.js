@@ -1148,6 +1148,18 @@ if (generateScreenshotBtn) {
     screenshotLoading.style.display = 'block';
     screenshotResult.innerHTML = '';
     
+    // Obtener fechas del rango seleccionado
+    let targetDates = [];
+    if (dateRange.start && dateRange.end) {
+      targetDates = generateDateArray(
+        dateRange.start.toISOString().split('T')[0],
+        dateRange.end.toISOString().split('T')[0]
+      );
+      console.log('📅 Generando screenshots para fechas:', targetDates);
+    } else {
+      console.log('📅 No hay rango seleccionado, usando fecha actual');
+    }
+    
     try {
       const response = await fetch('/generate-screenshot', {
         method: 'POST',
@@ -1155,15 +1167,27 @@ if (generateScreenshotBtn) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          deviceType: deviceType
+          deviceType: deviceType,
+          targetDates: targetDates
         })
       });
       
       const data = await response.json();
       
       if (data.success) {
-        // Verificar si hay múltiples screenshots
-        const screenshots = Array.isArray(data.data) ? data.data : [data.data];
+        // Combinar screenshots de desktop y mobile en un solo array
+        let screenshots = [];
+        if (data.data.desktop) {
+          screenshots = screenshots.concat(data.data.desktop);
+        }
+        if (data.data.mobile) {
+          screenshots = screenshots.concat(data.data.mobile);
+        }
+        
+        // Si no hay estructura desktop/mobile, usar el formato antiguo
+        if (screenshots.length === 0 && Array.isArray(data.data)) {
+          screenshots = data.data;
+        }
         
         let html = `
           <div class="card green lighten-5" style="border-left: 4px solid #4caf50;">
@@ -1177,16 +1201,17 @@ if (generateScreenshotBtn) {
           if (screenshot.success) {
             const visualizationLabel = screenshot.visualizationType ? 
               ` - Tipo ${screenshot.visualizationType}` : '';
+            const deviceLabel = screenshot.deviceType ? ` (${screenshot.deviceType})` : '';
+            const dateLabel = screenshot.date ? ` - ${screenshot.date}` : '';
             
             html += `
               <div style="margin-bottom: 20px; ${index > 0 ? 'padding-top: 15px; border-top: 1px solid #ddd;' : ''}">
-                <h6 class="purple-text">Screenshot ${index + 1}${visualizationLabel}</h6>
-                <p><strong>Dispositivo:</strong> ${screenshot.deviceType}</p>
+                <h6 class="purple-text">Screenshot ${index + 1}${visualizationLabel}${deviceLabel}${dateLabel}</h6>
                 <p><strong>Archivo:</strong> ${screenshot.fileName}</p>
-                <p><strong>Drive ID:</strong> <code>${screenshot.driveId}</code></p>
-                <p><strong>Link:</strong> <a href="${screenshot.driveLink}" target="_blank" class="purple-text text-darken-2">${screenshot.driveLink}</a></p>
+                <p><strong>Drive ID:</strong> <code>${screenshot.driveFileId || screenshot.driveId}</code></p>
+                <p><strong>Link:</strong> <a href="${screenshot.webViewLink || screenshot.driveLink}" target="_blank" class="purple-text text-darken-2">Ver en Drive</a></p>
                 <div class="center-align" style="margin-top: 10px;">
-                  <a href="${screenshot.driveLink}" target="_blank" class="btn waves-effect waves-light purple darken-2">
+                  <a href="${screenshot.webViewLink || screenshot.driveLink}" target="_blank" class="btn waves-effect waves-light purple darken-2">
                     <i class="material-icons left">open_in_new</i>
                     Ver en Google Drive
                   </a>
@@ -1197,7 +1222,7 @@ if (generateScreenshotBtn) {
             html += `
               <div style="margin-bottom: 20px; ${index > 0 ? 'padding-top: 15px; border-top: 1px solid #ddd;' : ''}">
                 <h6 class="red-text">Screenshot ${index + 1} - Error</h6>
-                <p><strong>Error:</strong> ${screenshot.error}</p>
+                <p><strong>Error:</strong> ${screenshot.error || 'Error desconocido'}</p>
               </div>
             `;
           }
@@ -1353,7 +1378,7 @@ function updateBreadcrumb() {
   breadcrumb.innerHTML = html;
 }
 
-// Cargar imágenes del día actual al iniciar la página
+// Inicializar galería al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
   // Obtener fecha actual en formato YYYY-MM-DD
   const today = new Date();
@@ -1362,8 +1387,15 @@ document.addEventListener('DOMContentLoaded', function() {
   const day = String(today.getDate()).padStart(2, '0');
   const todayString = `${year}-${month}-${day}`;
   
-  console.log('📅 Cargando imágenes del día actual:', todayString);
+  // Establecer fecha actual como display date
+  currentDisplayDate = todayString;
   
-  // Cargar imágenes del día actual
-  loadImagesForDate(todayString);
+  // Actualizar el display de fecha
+  const displayDateEl = document.getElementById('displayDate');
+  if (displayDateEl) {
+    displayDateEl.textContent = formatDate(new Date(todayString + 'T00:00:00'));
+  }
+  
+  console.log('📅 Galería inicializada. Fecha actual:', todayString);
+  console.log('ℹ️ Marca el checkbox "Mostrar imágenes" para ver las campañas');
 });

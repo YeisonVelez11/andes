@@ -357,7 +357,7 @@ app.post('/upload', async (req, res) => {
             itt: uploadedFiles.itt ? `/image/${uploadedFiles.itt.driveId}` : null,
             zocalo: uploadedFiles.zocalo ? `/image/${uploadedFiles.zocalo.driveId}` : null,
             deviceType: deviceType,
-            uploadedAt: new Date().toISOString()
+            uploadedAt: new Date(date + 'T00:00:00').toISOString() // Usar fecha de la campaña
           };
           
           // Agregar tipo_visualización solo si es desktop y está definido
@@ -420,7 +420,7 @@ app.post('/upload', async (req, res) => {
             itt: uploadedFiles.itt ? `/image/${uploadedFiles.itt.driveId}` : null,
             zocalo: uploadedFiles.zocalo ? `/image/${uploadedFiles.zocalo.driveId}` : null,
             deviceType: deviceType,
-            uploadedAt: new Date().toISOString()
+            uploadedAt: new Date(date + 'T00:00:00').toISOString() // Usar fecha de la campaña
           };
           
           // Agregar tipo_visualización solo si es desktop y está definido
@@ -522,7 +522,7 @@ app.get('/folders', async (req, res) => {
     });
 
     // Filtrar carpetas excluidas (imagenes, jsones, screenshots)
-    const excludedFolders = ['imagenes', 'jsones', 'screenshots'];
+    const excludedFolders = ['imagenes', 'jsones', 'screenshots', 'webs_pasado','config'];
     const filteredFolders = response.data.files.filter(folder => 
       !excludedFolders.includes(folder.name.toLowerCase())
     );
@@ -662,84 +662,167 @@ app.get('/image/:fileId', async (req, res) => {
   }
 });
 
+// Función para capturar y guardar HTML de Los Andes
+async function captureAndSaveHTML() {
+  const puppeteer = require('puppeteer');
+  const htmlFolderId = '1oxJv2q0M8vwvbmVErg95BjNO2fu2dKN9';
+  const url = 'https://www.losandes.com.ar/';
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  // Configuraciones para desktop y mobile
+  const configs = [
+    {
+      name: 'desktop',
+      fileName: `${today}_desktop.html`,
+      viewport: { width: 1920, height: 1080 }
+    },
+    {
+      name: 'mobile',
+      fileName: `${today}_mobile.html`,
+      viewport: { width: 400, height: 824 }
+    }
+  ];
+  
+  for (const config of configs) {
+    console.log(`📱 Capturando HTML ${config.name}...`);
+    
+    let browser;
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage'
+        ]
+      });
+      
+      const page = await browser.newPage();
+      await page.setViewport(config.viewport);
+      
+      // Navegar a la página
+      await page.goto(url, {
+        waitUntil: 'networkidle2',
+        timeout: 60000
+      });
+      
+      // Obtener el HTML completo
+      const html = await page.content();
+      
+      // Convertir HTML a buffer
+      const htmlBuffer = Buffer.from(html, 'utf-8');
+      
+      // Subir a Google Drive
+      const fileMetadata = {
+        name: config.fileName,
+        parents: [htmlFolderId],
+        mimeType: 'text/html'
+      };
+      
+      const media = {
+        mimeType: 'text/html',
+        body: require('stream').Readable.from(htmlBuffer)
+      };
+      
+      // Buscar si ya existe un archivo con ese nombre
+      const existingFiles = await driveClient.files.list({
+        q: `name='${config.fileName}' and '${htmlFolderId}' in parents and trashed=false`,
+        fields: 'files(id, name)',
+        spaces: 'drive'
+      });
+      
+      if (existingFiles.data.files.length > 0) {
+        // Actualizar archivo existente
+        const fileId = existingFiles.data.files[0].id;
+        await driveClient.files.update({
+          fileId: fileId,
+          media: media
+        });
+        console.log(`✅ HTML ${config.name} actualizado: ${config.fileName}`);
+      } else {
+        // Crear nuevo archivo
+        await driveClient.files.create({
+          requestBody: fileMetadata,
+          media: media,
+          fields: 'id, name, webViewLink'
+        });
+        console.log(`✅ HTML ${config.name} creado: ${config.fileName}`);
+      }
+      
+    } catch (error) {
+      console.error(`❌ Error capturando HTML ${config.name}:`, error.message);
+      throw error;
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
+    }
+  }
+}
+
 // Endpoint para generar screenshot de Los Andes
 app.post('/generate-screenshot', async (req, res) => {
   try {
     console.log('🚀 Generando screenshots de Los Andes...');
     
-    // Obtener tipo de dispositivo del body (por defecto: desktop)
-    const deviceType = req.body.deviceType || 'desktop';
-    console.log(`📱 Tipo de dispositivo solicitado: ${deviceType}`);
+    const targetDates = req.body.targetDates || []; // Array de fechas a procesar
     
-    // Si es desktop, obtener los JSONs del día actual y generar múltiples screenshots
-    if (deviceType === 'desktop') {
-      // Obtener fecha actual en formato YYYY-MM-DD
-      const today = new Date().toISOString().split('T')[0];
-      const jsonFileName = `${today}.json`;
+    // Si no se especificaron fechas, usar el día actual
+    const datesToProcess = targetDates.length > 0 
+      ? targetDates 
+      : [new Date().toISOString().split('T')[0]];
+    
+    console.log(`📅 Fechas a procesar: ${datesToProcess.join(', ')}`);
+    console.log(`📱 Generando screenshots para DESKTOP y MOBILE`);
+    
+    const allResults = {
+      desktop: [],
+      mobile: []
+    };
+    
+    // ============================================================
+    // PROCESAR DESKTOP
+    // ============================================================
+    console.log('\n🖥️ ===== PROCESANDO DESKTOP =====');
+    
+    for (const dateToProcess of datesToProcess) {
+      console.log(`\n📆 Procesando fecha DESKTOP: ${dateToProcess}`);
       
-      console.log(`📅 Buscando JSONs para la fecha: ${today}`);
-      
-      // Buscar el archivo JSON del día actual
+      const jsonFileName = `${dateToProcess}.json`;
       const existingFile = await findJsonFileByName(jsones, jsonFileName);
       
       if (!existingFile) {
-        console.log('⚠️ No se encontraron JSONs para el día actual, generando screenshot simple...');
-        const result = await scrapeLosAndes(deviceType, capturas);
-        return res.json({
-          success: true,
-          message: 'Screenshot generado exitosamente (sin JSONs del día)',
-          data: [result]
-        });
+        console.log(`⚠️ No se encontró JSON para ${dateToProcess}, saltando...`);
+        continue;
       }
       
-      // Obtener contenido del JSON
       const jsonContent = await getJsonFileContent(existingFile.id);
       const jsonData = Array.isArray(jsonContent) ? jsonContent : [];
-      
-      // Filtrar solo los registros de desktop
       const desktopRecords = jsonData.filter(record => record.deviceType === 'desktop');
       
       if (desktopRecords.length === 0) {
-        console.log('⚠️ No se encontraron registros desktop, generando screenshot simple...');
-        const result = await scrapeLosAndes(deviceType, capturas);
-        return res.json({
-          success: true,
-          message: 'Screenshot generado exitosamente (sin registros desktop)',
-          data: [result]
-        });
+        console.log(`⚠️ No se encontraron registros desktop para ${dateToProcess}, saltando...`);
+        continue;
       }
       
-      console.log(`📊 Se encontraron ${desktopRecords.length} registros desktop para procesar`);
+      console.log(`📊 Se encontraron ${desktopRecords.length} registros desktop para ${dateToProcess}`);
       
-      // Generar un screenshot por cada registro con tipo_visualizacion
-      const results = [];
       for (let i = 0; i < desktopRecords.length; i++) {
         const record = desktopRecords[i];
         const visualizationType = record.tipo_visualizacion || 'A';
-        
-        // Obtener carpeta de destino del registro (si existe)
         const targetFolderId = record.carpeta_id || capturas;
         const targetFolderName = record.carpeta_nombre || 'capturas (default)';
         
-        console.log(`\n🎬 Generando screenshot ${i + 1}/${desktopRecords.length} - Tipo: ${visualizationType}`);
+        console.log(`\n🎬 Generando screenshot DESKTOP ${i + 1}/${desktopRecords.length} - Tipo: ${visualizationType}`);
         console.log(`📁 Carpeta destino: ${targetFolderName} (ID: ${targetFolderId})`);
         
         try {
-          // Obtener el host correcto (considerando ngrok y proxies)
           const forwardedHost = req.get('x-forwarded-host');
           const forwardedProto = req.get('x-forwarded-proto');
           const host = forwardedHost || req.get('host');
           const protocol = forwardedProto || req.protocol;
           const baseUrl = `${protocol}://${host}`;
           
-          console.log(`🔍 Headers detectados:`);
-          console.log(`   - x-forwarded-host: ${forwardedHost || 'no presente'}`);
-          console.log(`   - x-forwarded-proto: ${forwardedProto || 'no presente'}`);
-          console.log(`   - host: ${req.get('host')}`);
-          console.log(`   - protocol: ${req.protocol}`);
-          console.log(`🌐 Base URL final: ${baseUrl}`);
-          
-          // Preparar datos del JSON con URLs completas de Drive
           const jsonDataForScraper = {
             imagenLateral: record.imagenLateral ? `${baseUrl}${record.imagenLateral}` : null,
             imagenAncho: record.imagenAncho ? `${baseUrl}${record.imagenAncho}` : null,
@@ -748,42 +831,133 @@ app.post('/generate-screenshot', async (req, res) => {
             zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null
           };
           
-          console.log('📄 URLs de imágenes preparadas:', jsonDataForScraper);
+          const currentDate = new Date().toISOString().split('T')[0];
+          const targetDate = (dateToProcess < currentDate) ? dateToProcess : null;
           
-          const result = await scrapeLosAndes(deviceType, targetFolderId, visualizationType, jsonDataForScraper);
-          results.push({
+          const result = await scrapeLosAndes('desktop', targetFolderId, visualizationType, jsonDataForScraper, targetDate);
+          allResults.desktop.push({
             ...result,
-            visualizationType: visualizationType,
-            recordIndex: i
+            visualizationType,
+            recordIndex: i,
+            date: dateToProcess,
+            deviceType: 'desktop'
           });
         } catch (error) {
-          console.error(`❌ Error en screenshot ${i + 1}:`, error.message);
-          results.push({
+          console.error(`❌ Error en screenshot DESKTOP ${i + 1}:`, error.message);
+          allResults.desktop.push({
             success: false,
             error: error.message,
-            visualizationType: visualizationType,
-            recordIndex: i
+            visualizationType,
+            recordIndex: i,
+            date: dateToProcess,
+            deviceType: 'desktop'
           });
         }
       }
-      
-      res.json({
-        success: true,
-        message: `${results.length} screenshots generados exitosamente`,
-        data: results
-      });
-      
-    } else {
-      // Para mobile, generar un solo screenshot
-      console.log('📱 Generando screenshot mobile...');
-      const result = await scrapeLosAndes(deviceType, capturas);
-      
-      res.json({
-        success: true,
-        message: 'Screenshot generado exitosamente',
-        data: [result]
-      });
     }
+    
+    // ============================================================
+    // PROCESAR MOBILE
+    // ============================================================
+    console.log('\n📱 ===== PROCESANDO MOBILE =====');
+    
+    for (const dateToProcess of datesToProcess) {
+      console.log(`\n📆 Procesando fecha MOBILE: ${dateToProcess}`);
+      
+      const jsonFileName = `${dateToProcess}.json`;
+      const existingFile = await findJsonFileByName(jsones, jsonFileName);
+      
+      if (!existingFile) {
+        console.log(`⚠️ No se encontró JSON para ${dateToProcess}, saltando...`);
+        continue;
+      }
+      
+      const jsonContent = await getJsonFileContent(existingFile.id);
+      const jsonData = Array.isArray(jsonContent) ? jsonContent : [];
+      const mobileRecords = jsonData.filter(record => record.deviceType === 'mobile');
+      
+      if (mobileRecords.length === 0) {
+        console.log(`⚠️ No se encontraron registros mobile para ${dateToProcess}, saltando...`);
+        continue;
+      }
+      
+      console.log(`📊 Se encontraron ${mobileRecords.length} registros mobile para ${dateToProcess}`);
+      
+      for (let i = 0; i < mobileRecords.length; i++) {
+        const record = mobileRecords[i];
+        const targetFolderId = record.carpeta_id || capturas;
+        const targetFolderName = record.carpeta_nombre || 'capturas (default)';
+        
+        console.log(`\n🎬 Generando screenshot MOBILE ${i + 1}/${mobileRecords.length}`);
+        console.log(`📁 Carpeta destino: ${targetFolderName} (ID: ${targetFolderId})`);
+        
+        try {
+          const forwardedHost = req.get('x-forwarded-host');
+          const forwardedProto = req.get('x-forwarded-proto');
+          const host = forwardedHost || req.get('host');
+          const protocol = forwardedProto || req.protocol;
+          const baseUrl = `${protocol}://${host}`;
+          
+          const jsonDataForScraper = {
+            imagenLateral: null,
+            imagenAncho: null,
+            imagenTop: null,
+            itt: null,
+            zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null
+          };
+          
+          const currentDate = new Date().toISOString().split('T')[0];
+          const targetDate = (dateToProcess < currentDate) ? dateToProcess : null;
+          
+          const result = await scrapeLosAndes('mobile', targetFolderId, null, jsonDataForScraper, targetDate);
+          allResults.mobile.push({
+            ...result,
+            recordIndex: i,
+            date: dateToProcess,
+            deviceType: 'mobile'
+          });
+        } catch (error) {
+          console.error(`❌ Error en screenshot MOBILE ${i + 1}:`, error.message);
+          allResults.mobile.push({
+            success: false,
+            error: error.message,
+            recordIndex: i,
+            date: dateToProcess,
+            deviceType: 'mobile'
+          });
+        }
+      }
+    }
+    
+    // ============================================================
+    // CAPTURAR HTML (solo si hay fecha actual)
+    // ============================================================
+    const currentDate = new Date().toISOString().split('T')[0];
+    const hasCurrentDate = datesToProcess.includes(currentDate);
+    
+    if (hasCurrentDate) {
+      console.log('\n📄 Capturando HTML de Los Andes (fecha actual detectada)...');
+      try {
+        await captureAndSaveHTML();
+        console.log('✅ HTML capturado y guardado exitosamente');
+      } catch (htmlError) {
+        console.error('⚠️ Error al capturar HTML:', htmlError.message);
+      }
+    } else {
+      console.log('\n⏭️ Saltando captura de HTML (solo fechas pasadas procesadas)');
+    }
+    
+    // ============================================================
+    // RESPUESTA FINAL
+    // ============================================================
+    const totalScreenshots = allResults.desktop.length + allResults.mobile.length;
+    
+    res.json({
+      success: true,
+      message: `${totalScreenshots} screenshots generados exitosamente (${allResults.desktop.length} desktop, ${allResults.mobile.length} mobile) para ${datesToProcess.length} fecha(s)`,
+      data: allResults
+    });
+    
   } catch (error) {
     console.error('❌ Error generando screenshot:', error.message);
     res.status(500).json({

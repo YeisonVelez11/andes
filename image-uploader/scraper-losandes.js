@@ -51,9 +51,12 @@ async function uploadBufferToDrive(driveClient, folderId, fileName, buffer, mime
 }
 
 // Función principal de scraping
-async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualizationType = null, jsonData = null) {
+async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualizationType = null, jsonData = null, targetDate = null) {
     console.log('🚀 Iniciando scraper de Los Andes...');
     console.log(`📱 Tipo de dispositivo: ${deviceType}`);
+    if (targetDate) {
+        console.log(`📅 Fecha objetivo: ${targetDate}`);
+    }
     if (visualizationType) {
         console.log(`🎨 Tipo de visualización: ${visualizationType}`);
     }
@@ -142,22 +145,79 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         const context = browser.defaultBrowserContext();
         await context.overridePermissions('https://www.losandes.com.ar', ['geolocation', 'notifications']);
 
-        console.log('🌐 Navegando a Los Andes...');
-        
-        // Navegar a la página con timeout extendido y manejo de errores
-        try {
-            await page.goto('https://www.losandes.com.ar/', {
-                waitUntil: 'domcontentloaded',
-                timeout: 90000
-            });
-            console.log('✅ Página cargada exitosamente');
-        } catch (navError) {
-            console.warn('⚠️ Error en navegación inicial, reintentando...');
-            await page.goto('https://www.losandes.com.ar/', {
-                waitUntil: 'load',
-                timeout: 90000
-            });
-            console.log('✅ Página cargada en segundo intento');
+        // Si hay una fecha objetivo, cargar HTML guardado en lugar de la página en vivo
+        if (targetDate) {
+            console.log(`📂 Cargando HTML guardado para la fecha: ${targetDate}`);
+            
+            try {
+                // Conectar con Google Drive
+                const driveClient = google.drive({ version: 'v3', auth: await authorize() });
+                const htmlFolderId = '1oxJv2q0M8vwvbmVErg95BjNO2fu2dKN9';
+                const fileName = `${targetDate}_${deviceType}.html`;
+                
+                console.log(`🔍 Buscando archivo: ${fileName}`);
+                
+                // Buscar el archivo HTML
+                const fileList = await driveClient.files.list({
+                    q: `name='${fileName}' and '${htmlFolderId}' in parents and trashed=false`,
+                    fields: 'files(id, name)',
+                    spaces: 'drive'
+                });
+                
+                if (fileList.data.files.length === 0) {
+                    console.warn(`⚠️ No se encontró HTML para ${targetDate}, cargando página en vivo...`);
+                    throw new Error('HTML no encontrado');
+                }
+                
+                const fileId = fileList.data.files[0].id;
+                console.log(`✅ Archivo encontrado: ${fileName} (ID: ${fileId})`);
+                
+                // Descargar el contenido del HTML
+                const response = await driveClient.files.get(
+                    { fileId: fileId, alt: 'media' },
+                    { responseType: 'text' }
+                );
+                
+                const htmlContent = response.data;
+                console.log(`📄 HTML descargado (${htmlContent.length} caracteres)`);
+                
+                // Cargar el HTML en la página
+                await page.setContent(htmlContent, {
+                    waitUntil: 'domcontentloaded',
+                    timeout: 30000
+                });
+                
+                console.log('✅ HTML histórico cargado exitosamente');
+                
+            } catch (htmlError) {
+                console.error(`❌ Error cargando HTML histórico: ${htmlError.message}`);
+                console.log('🌐 Fallback: Cargando página en vivo...');
+                
+                // Fallback a página en vivo
+                await page.goto('https://www.losandes.com.ar/', {
+                    waitUntil: 'domcontentloaded',
+                    timeout: 90000
+                });
+                console.log('✅ Página en vivo cargada como fallback');
+            }
+        } else {
+            console.log('🌐 Navegando a Los Andes (página en vivo)...');
+            
+            // Navegar a la página con timeout extendido y manejo de errores
+            try {
+                await page.goto('https://www.losandes.com.ar/', {
+                    waitUntil: 'domcontentloaded',
+                    timeout: 90000
+                });
+                console.log('✅ Página cargada exitosamente');
+            } catch (navError) {
+                console.warn('⚠️ Error en navegación inicial, reintentando...');
+                await page.goto('https://www.losandes.com.ar/', {
+                    waitUntil: 'load',
+                    timeout: 90000
+                });
+                console.log('✅ Página cargada en segundo intento');
+            }
         }
 
         // Esperar un poco para que todo cargue completamente
@@ -721,17 +781,18 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             var finalScreenshot = screenshotBuffer;
         } else {
             // Generar fecha y hora en formato "Mié 22 de oct. 10:24 p.m."
-            const now = new Date();
+            // Si hay targetDate (fecha pasada), usar esa fecha en lugar de la actual
+            const dateToUse = targetDate ? new Date(targetDate + 'T00:00:00') : new Date();
             const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
             const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
             
-            const diaSemana = diasSemana[now.getDay()];
-            const dia = now.getDate();
-            const mes = meses[now.getMonth()];
+            const diaSemana = diasSemana[dateToUse.getDay()];
+            const dia = dateToUse.getDate();
+            const mes = meses[dateToUse.getMonth()];
             
             // Solo fecha para la barra (sin hora)
             const fecha = `${diaSemana} ${dia} de ${mes}.`;
-            console.log(`📅 Fecha para barra: ${fecha}`);
+            console.log(`📅 Fecha para barra: ${fecha}${targetDate ? ' (fecha histórica)' : ''}`);
             
             // Escapar caracteres especiales para XML/SVG
             const escapedFecha = fecha
@@ -813,9 +874,20 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         // Generar nombre de archivo con timestamp, tipo de dispositivo y visualización
         // Formato: YYYY-MM-DD-HH-MM-SS-[tipo_visualizacion].png
         const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
+        
+        // Si hay targetDate (fecha pasada), usar esa fecha en lugar de la actual
+        let year, month, day;
+        if (targetDate) {
+            const targetDateObj = new Date(targetDate + 'T00:00:00');
+            year = targetDateObj.getFullYear();
+            month = String(targetDateObj.getMonth() + 1).padStart(2, '0');
+            day = String(targetDateObj.getDate()).padStart(2, '0');
+        } else {
+            year = now.getFullYear();
+            month = String(now.getMonth() + 1).padStart(2, '0');
+            day = String(now.getDate()).padStart(2, '0');
+        }
+        
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const seconds = String(now.getSeconds()).padStart(2, '0');
