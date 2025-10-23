@@ -536,6 +536,14 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         if (deviceType === 'desktop' && visualizationType === 'D' && jsonData) {
             console.log('🖼️ Insertando imágenes para visualización tipo D...');
             
+            // Quitar scroll del html y body
+            console.log('🚫 Quitando scroll de html y body...');
+            await page.evaluate(() => {
+                document.documentElement.style.overflow = 'hidden';
+                document.body.style.overflow = 'hidden';
+                console.log('✅ Scroll removido de html y body');
+            });
+            
             // Hacer scroll a 0px
             console.log('📜 Haciendo scroll a 0px...');
             await page.evaluate(() => {
