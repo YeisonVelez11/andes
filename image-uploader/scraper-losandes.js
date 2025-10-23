@@ -198,81 +198,147 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         if (deviceType === 'desktop' && visualizationType === 'A' && jsonData) {
             console.log('🖼️ Insertando imágenes para visualización tipo A...');
             
-            // Hacer scroll a 400px
-            console.log('📜 Haciendo scroll a 400px...');
+            // Hacer scroll a 200px
+            console.log('📜 Haciendo scroll a 200px...');
             await page.evaluate(() => {
-                window.scrollTo(0, 400);
+                window.scrollTo(0, 250);
             });
             
             // Esperar un poco después del scroll
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             // Insertar imágenes en la página
-            await page.evaluate((data) => {
-                const navbarHeight = 68;
-                
-                // Obtener el elemento de referencia para imagen lateral
-                const referenceElement = document.querySelector('.row.row--eq-height .col-12.col-md-9 .news-article--featured-listing-large-container');
-                
-                if (!referenceElement) {
-                    console.error('❌ No se encontró el elemento de referencia para imagen lateral');
-                    return;
-                }
-                
-                const refRect = referenceElement.getBoundingClientRect();
-                const viewportHeight = window.innerHeight;
-                
-                // Calcular espacio disponible debajo del navbar
-                const availableHeight = viewportHeight - navbarHeight;
-                
-                // Insertar imagen lateral si existe
-                if (data.imagenLateral) {
-                    const imgLateral = document.createElement('img');
-                    imgLateral.src = data.imagenLateral;
-                    imgLateral.style.position = 'fixed';
-                    imgLateral.style.left = (refRect.right + 30) + 'px';
-                    imgLateral.style.zIndex = '9999';
-                    imgLateral.id = 'inserted-imagen-lateral';
-                    
-                    // Cargar imagen para obtener dimensiones
-                    imgLateral.onload = function() {
-                        // Centrar verticalmente en el espacio disponible
-                        const imgHeight = this.naturalHeight;
-                        const topPosition = navbarHeight + (availableHeight - imgHeight) / 2;
-                        this.style.top = topPosition + 'px';
-                        console.log('✅ Imagen lateral insertada');
+            const insertResult = await page.evaluate((data) => {
+                return new Promise((resolve) => {
+                    const navbarHeight = 68;
+                    const results = {
+                        lateral: { found: false, inserted: false, error: null },
+                        ancho: { found: false, inserted: false, error: null }
                     };
                     
-                    document.body.appendChild(imgLateral);
-                }
-                
-                // Insertar imagen ancho si existe
-                if (data.imagenAncho) {
-                    const rowElement = document.querySelector('.row.row--eq-height .col-12.col-md-9 .row.news-article-wrapper');
-                    if (rowElement) {
-                        const rowRect = rowElement.getBoundingClientRect();
+                    // Obtener el elemento de referencia para imagen lateral
+                    const referenceElement = document.querySelector('.row.row--eq-height .col-12.col-md-9 .news-article--featured-listing-large-container');
+                    
+                    if (!referenceElement) {
+                        results.lateral.error = 'No se encontró el elemento de referencia';
+                        console.error('❌ No se encontró el elemento de referencia para imagen lateral');
+                        console.log('Intentando selector alternativo...');
                         
-                        const imgAncho = document.createElement('img');
-                        imgAncho.src = data.imagenAncho;
-                        imgAncho.style.position = 'fixed';
-                        imgAncho.style.top = (rowRect.bottom + 30) + 'px';
-                        imgAncho.style.left = '50%';
-                        imgAncho.style.transform = 'translateX(-50%)';
-                        imgAncho.style.zIndex = '9999';
-                        imgAncho.id = 'inserted-imagen-ancho';
+                        // Intentar selector alternativo
+                        const altElement = document.querySelector('.row.row--eq-height .col-12.col-md-9');
+                        if (altElement) {
+                            console.log('✅ Encontrado selector alternativo');
+                            results.lateral.found = true;
+                            results.lateral.refRect = altElement.getBoundingClientRect();
+                        }
+                    } else {
+                        results.lateral.found = true;
+                        results.lateral.refRect = referenceElement.getBoundingClientRect();
+                        console.log('✅ Elemento de referencia encontrado:', results.lateral.refRect);
+                    }
+                    
+                    const refRect = results.lateral.refRect;
+                    const viewportHeight = window.innerHeight;
+                    const availableHeight = viewportHeight - navbarHeight;
+                    
+                    let imagesLoaded = 0;
+                    const totalImages = (data.imagenLateral ? 1 : 0) + (data.imagenAncho ? 1 : 0);
+                    
+                    function checkComplete() {
+                        if (imagesLoaded >= totalImages) {
+                            resolve(results);
+                        }
+                    }
+                    
+                    // Insertar imagen lateral si existe
+                    if (data.imagenLateral && refRect) {
+                        const imgLateral = document.createElement('img');
+                        imgLateral.crossOrigin = 'anonymous';
+                        imgLateral.src = data.imagenLateral;
+                        imgLateral.style.position = 'absolute';
+                        imgLateral.style.left = (refRect.right + 25 + window.scrollX) + 'px';
+                        imgLateral.style.zIndex = '9999';
+                        imgLateral.id = 'inserted-imagen-lateral';
                         
-                        imgAncho.onload = function() {
-                            console.log('✅ Imagen ancho insertada');
+                        imgLateral.onload = function() {
+                            const imgHeight = this.height;
+                            const topPosition = navbarHeight + (availableHeight - imgHeight) / 2 + window.scrollY;
+                            this.style.top = topPosition + 'px';
+                            results.lateral.inserted = true;
+                            results.lateral.position = { left: this.style.left, top: this.style.top };
+                            console.log('✅ Imagen lateral insertada en:', this.style.left, this.style.top);
+                            imagesLoaded++;
+                            checkComplete();
                         };
                         
-                        document.body.appendChild(imgAncho);
+                        imgLateral.onerror = function() {
+                            results.lateral.error = 'Error al cargar imagen';
+                            console.error('❌ Error al cargar imagen lateral');
+                            imagesLoaded++;
+                            checkComplete();
+                        };
+                        
+                        document.body.appendChild(imgLateral);
+                    } else {
+                        if (!data.imagenLateral) imagesLoaded++;
                     }
-                }
+                    
+                    // Insertar imagen ancho si existe
+                    if (data.imagenAncho) {
+                        const rowElement = document.querySelector('.row.row--eq-height .col-12.col-md-9 .row.news-article-wrapper');
+                        if (rowElement) {
+                            results.ancho.found = true;
+                            const rowRect = rowElement.getBoundingClientRect();
+                            results.ancho.refRect = rowRect;
+                            
+                            const imgAncho = document.createElement('img');
+                            imgAncho.crossOrigin = 'anonymous';
+                            imgAncho.src = data.imagenAncho;
+                            imgAncho.style.position = 'absolute';
+                            imgAncho.style.top = (rowRect.bottom + 30 + window.scrollY) + 'px';
+                            imgAncho.style.left = '50%';
+                            imgAncho.style.transform = 'translateX(-50%)';
+                            imgAncho.style.zIndex = '9999';
+                            imgAncho.id = 'inserted-imagen-ancho';
+                            
+                            imgAncho.onload = function() {
+                                results.ancho.inserted = true;
+                                results.ancho.position = { left: this.style.left, top: this.style.top };
+                                console.log('✅ Imagen ancho insertada en:', this.style.left, this.style.top);
+                                imagesLoaded++;
+                                checkComplete();
+                            };
+                            
+                            imgAncho.onerror = function() {
+                                results.ancho.error = 'Error al cargar imagen';
+                                console.error('❌ Error al cargar imagen ancho');
+                                imagesLoaded++;
+                                checkComplete();
+                            };
+                            
+                            document.body.appendChild(imgAncho);
+                        } else {
+                            results.ancho.error = 'No se encontró el elemento .row.news-article-wrapper';
+                            console.error('❌ No se encontró el elemento para imagen ancho');
+                            imagesLoaded++;
+                            checkComplete();
+                        }
+                    } else {
+                        imagesLoaded++;
+                    }
+                    
+                    // Timeout de seguridad
+                    setTimeout(() => {
+                        resolve(results);
+                    }, 5000);
+                });
             }, jsonData);
             
-            // Esperar a que las imágenes se carguen
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            console.log('✅ Imágenes insertadas correctamente');
+            console.log('📊 Resultado de inserción de imágenes:', JSON.stringify(insertResult, null, 2));
+            
+            // Esperar a que las imágenes se carguen completamente
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log('✅ Proceso de inserción de imágenes completado');
         }
 
         console.log('📸 Tomando screenshot...');
@@ -355,7 +421,7 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             const blackBarProportion = 0.161;
             const blackBarHeight = actualBarHeight * blackBarProportion;
             // Centrar verticalmente: mitad de la altura de la barra negra + mitad del tamaño de fuente
-            const textVerticalPosition = Math.round((blackBarHeight / 2) + (fontSize / 2.5));
+            const textVerticalPosition = Math.round((blackBarHeight / 2) + (fontSize / 2.5)) + 10;
             
             const svgText = `<svg width="${screenshotWidth}" height="${actualBarHeight}" xmlns="http://www.w3.org/2000/svg">
     <defs>
