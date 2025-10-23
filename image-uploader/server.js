@@ -179,6 +179,7 @@ function generateDateRange(startDate, endDate) {
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+app.use('/screenshots', express.static('screenshots'));
 
 // Configuración de Multer para almacenamiento en memoria (sin guardar localmente)
 const storage = multer.memoryStorage();
