@@ -122,54 +122,6 @@
         </div>
       </div>
 
-      <!-- Selector de Carpeta para Screenshots -->
-      <div class="row">
-        <div class="col s12">
-          <div class="card orange lighten-5">
-            <div class="card-content">
-              <span class="card-title">
-                <i class="material-icons left">folder</i>
-                Carpeta de Destino para Screenshots
-              </span>
-              <p class="grey-text">Selecciona la carpeta donde se guardarán los screenshots generados</p>
-              
-              <!-- Breadcrumb de navegación -->
-              <div id="folderBreadcrumb" style="margin: 15px 0; padding: 10px; background: white; border-radius: 4px;">
-                <i class="material-icons tiny" style="vertical-align: middle;">home</i>
-                <span class="grey-text">Cargando...</span>
-              </div>
-              
-              <!-- Lista de carpetas -->
-              <div id="folderList" style="max-height: 300px; overflow-y: auto; background: white; border-radius: 4px; padding: 10px;">
-                <div class="center-align">
-                  <div class="preloader-wrapper small active">
-                    <div class="spinner-layer spinner-orange-only">
-                      <div class="circle-clipper left">
-                        <div class="circle"></div>
-                      </div>
-                      <div class="gap-patch">
-                        <div class="circle"></div>
-                      </div>
-                      <div class="circle-clipper right">
-                        <div class="circle"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <p class="grey-text">Cargando carpetas...</p>
-                </div>
-              </div>
-              
-              <!-- Carpeta seleccionada -->
-              <div id="selectedFolder" style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px; display: none;">
-                <p><strong>Carpeta seleccionada:</strong></p>
-                <p class="orange-text"><i class="material-icons tiny">folder</i> <span id="selectedFolderName"></span></p>
-                <input type="hidden" id="selectedFolderId" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <form id="uploadForm" enctype="multipart/form-data">
         <!-- Imagen Lateral -->
         <div class="row">
@@ -178,7 +130,7 @@
               <div class="card-content">
                 <span class="card-title">
                   <i class="material-icons left">view_sidebar</i>
-                  Imagen Lateral
+                  Banner Lateral
                 </span>
                 <p class="grey-text">Tamaños permitidos: 300x250, 300x600, 160x600</p>
                 
@@ -207,7 +159,7 @@
               <div class="card-content">
                 <span class="card-title">
                   <i class="material-icons left">view_week</i>
-                  Imagen Ancho
+                  Banner Ancho
                 </span>
                 <p class="grey-text device-sizes">
                   <span class="desktop-size">Desktop: 728x90, 990x90, 970x250</span>
@@ -239,7 +191,7 @@
               <div class="card-content">
                 <span class="card-title">
                   <i class="material-icons left">vertical_align_top</i>
-                  Imagen Top
+                  Banner Top
                 </span>
                 <p class="grey-text">Tamaños permitidos: 728x90, 990x90</p>
                 
@@ -322,12 +274,63 @@
           </div>
         </div>
 
+        <!-- Selector de Carpeta para Screenshots -->
+        <div class="row">
+          <div class="col s12">
+            <div class="card orange lighten-5">
+              <div class="card-content">
+                <span class="card-title">
+                  <i class="material-icons left">folder</i>
+                  Carpeta de Destino para Screenshots
+                  <span class="red-text" style="font-size: 1.2rem;">*</span>
+                </span>
+                <p class="grey-text">
+                  <strong class="orange-text">Obligatorio:</strong> Selecciona la carpeta donde se guardarán los screenshots generados
+                </p>
+                
+                <!-- Breadcrumb de navegación -->
+                <div id="folderBreadcrumb" style="margin: 15px 0; padding: 10px; background: white; border-radius: 4px;">
+                  <i class="material-icons tiny" style="vertical-align: middle;">home</i>
+                  <span class="grey-text">Cargando...</span>
+                </div>
+                
+                <!-- Lista de carpetas -->
+                <div id="folderList" style="max-height: 300px; overflow-y: auto; background: white; border-radius: 4px; padding: 10px;">
+                  <div class="center-align">
+                    <div class="preloader-wrapper small active">
+                      <div class="spinner-layer spinner-orange-only">
+                        <div class="circle-clipper left">
+                          <div class="circle"></div>
+                        </div>
+                        <div class="gap-patch">
+                          <div class="circle"></div>
+                        </div>
+                        <div class="circle-clipper right">
+                          <div class="circle"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <p class="grey-text">Cargando carpetas...</p>
+                  </div>
+                </div>
+                
+                <!-- Carpeta seleccionada -->
+                <div id="selectedFolder" style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px; display: none;">
+                  <p><strong>Carpeta seleccionada:</strong></p>
+                  <p class="orange-text"><i class="material-icons tiny">folder</i> <span id="selectedFolderName"></span></p>
+                  <input type="hidden" id="selectedFolderId" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Botones de Acción -->
         <div class="row">
           <div class="col s12 center-align">
             <button type="submit" class="btn-large waves-effect waves-light green" id="submitBtn">
               <i class="material-icons left">cloud_upload</i>
-              Subir Imágenes
+              Subir Campaña
             </button>
             <button type="button" class="btn-large waves-effect waves-light red" id="clearBtn">
               <i class="material-icons left">clear</i>
@@ -388,7 +391,7 @@
     </div>
   </div>
 
-  <!-- Galería de Imágenes del Día -->
+  <!-- Campañas por Día -->
   <div class="container">
     <div class="row">
       <div class="col s12">
@@ -396,8 +399,8 @@
           <li>
             <div class="collapsible-header" style="display: flex; justify-content: space-between; align-items: center;">
               <div>
-                <i class="material-icons">photo_library</i>
-                Galería de Imágenes del Día
+                <i class="material-icons">campaign</i>
+                Campañas por Día
               </div>
               <label style="margin-right: 10px;" onclick="event.stopPropagation();">
                 <input type="checkbox" id="showImagesCheckbox" />

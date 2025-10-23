@@ -112,6 +112,11 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
         await page.setUserAgent(userAgent);
         
+        // Agregar header para ngrok
+        await page.setExtraHTTPHeaders({
+            'ngrok-skip-browser-warning': 'true'
+        });
+        
         // Ocultar webdriver
         await page.evaluateOnNewDocument(() => {
             Object.defineProperty(navigator, 'webdriver', {

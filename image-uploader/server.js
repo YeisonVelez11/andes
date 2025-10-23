@@ -178,6 +178,17 @@ function generateDateRange(startDate, endDate) {
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Middleware para manejar ngrok y headers
+app.use((req, res, next) => {
+  // Permitir acceso desde ngrok
+  res.setHeader('ngrok-skip-browser-warning', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  next();
+});
+
 app.use(express.static('public'));
 // Servir carpeta screenshots para las imágenes de preview en el HTML
 app.use('/screenshots', express.static('screenshots'));
@@ -633,9 +644,11 @@ app.get('/image/:fileId', async (req, res) => {
       { responseType: 'stream' }
     );
 
-    // Establecer headers apropiados
-    res.setHeader('Content-Type', response.headers['content-type']);
+    // Establecer headers apropiados para ngrok y CORS
+    res.setHeader('Content-Type', response.headers['content-type'] || 'image/png');
     res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache por 24 horas
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('ngrok-skip-browser-warning', 'true');
 
     // Pipe el stream de Drive a la respuesta
     response.data.pipe(res);
@@ -644,6 +657,7 @@ app.get('/image/:fileId', async (req, res) => {
     // Enviar una imagen transparente 1x1 en caso de error
     const transparentPixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
     res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.send(transparentPixel);
   }
 });
@@ -711,13 +725,27 @@ app.post('/generate-screenshot', async (req, res) => {
         console.log(`📁 Carpeta destino: ${targetFolderName} (ID: ${targetFolderId})`);
         
         try {
+          // Obtener el host correcto (considerando ngrok y proxies)
+          const forwardedHost = req.get('x-forwarded-host');
+          const forwardedProto = req.get('x-forwarded-proto');
+          const host = forwardedHost || req.get('host');
+          const protocol = forwardedProto || req.protocol;
+          const baseUrl = `${protocol}://${host}`;
+          
+          console.log(`🔍 Headers detectados:`);
+          console.log(`   - x-forwarded-host: ${forwardedHost || 'no presente'}`);
+          console.log(`   - x-forwarded-proto: ${forwardedProto || 'no presente'}`);
+          console.log(`   - host: ${req.get('host')}`);
+          console.log(`   - protocol: ${req.protocol}`);
+          console.log(`🌐 Base URL final: ${baseUrl}`);
+          
           // Preparar datos del JSON con URLs completas de Drive
           const jsonDataForScraper = {
-            imagenLateral: record.imagenLateral ? `${req.protocol}://${req.get('host')}${record.imagenLateral}` : null,
-            imagenAncho: record.imagenAncho ? `${req.protocol}://${req.get('host')}${record.imagenAncho}` : null,
-            imagenTop: record.imagenTop ? `${req.protocol}://${req.get('host')}${record.imagenTop}` : null,
-            itt: record.itt ? `${req.protocol}://${req.get('host')}${record.itt}` : null,
-            zocalo: record.zocalo ? `${req.protocol}://${req.get('host')}${record.zocalo}` : null
+            imagenLateral: record.imagenLateral ? `${baseUrl}${record.imagenLateral}` : null,
+            imagenAncho: record.imagenAncho ? `${baseUrl}${record.imagenAncho}` : null,
+            imagenTop: record.imagenTop ? `${baseUrl}${record.imagenTop}` : null,
+            itt: record.itt ? `${baseUrl}${record.itt}` : null,
+            zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null
           };
           
           console.log('📄 URLs de imágenes preparadas:', jsonDataForScraper);

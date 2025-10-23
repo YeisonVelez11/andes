@@ -317,9 +317,19 @@ function handleFileSelect(event, inputId) {
 function createImagePreview(file, inputId) {
   const reader = new FileReader();
   
+  reader.onerror = function(error) {
+    console.error('Error al leer archivo:', error);
+    M.toast({ html: 'Error al cargar la imagen. Intenta con un archivo más pequeño.', classes: 'red' });
+  };
+  
   reader.onload = function(e) {
     const img = new Image();
     img.src = e.target.result;
+    
+    img.onerror = function() {
+      console.error('Error al cargar imagen en preview');
+      M.toast({ html: 'Error al mostrar la imagen. Verifica el formato del archivo.', classes: 'red' });
+    };
     
     img.onload = function() {
       const previewContainer = document.getElementById(`preview-${inputId}`);
@@ -454,6 +464,14 @@ async function handleFormSubmit(e) {
   // Validar que un rango de fechas esté seleccionado
   if (!dateRange.start || !dateRange.end) {
     M.toast({ html: 'Por favor selecciona un rango de fechas', classes: 'orange' });
+    return;
+  }
+  
+  // Validar que una carpeta esté seleccionada
+  if (!selectedFolderId || !selectedFolderName) {
+    M.toast({ html: 'Por favor selecciona una carpeta de destino para los screenshots', classes: 'orange' });
+    // Hacer scroll hacia el selector de carpetas
+    document.getElementById('folderList').scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
 
