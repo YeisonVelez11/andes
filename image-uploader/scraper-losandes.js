@@ -435,6 +435,80 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             }
         }
 
+        // Si es tipo C desktop y hay datos JSON, insertar imagen top
+        if (deviceType === 'desktop' && visualizationType === 'C' && jsonData) {
+            console.log('🖼️ Insertando imágenes para visualización tipo C...');
+            
+            // Hacer scroll a 0px (top de la página)
+            console.log('📜 Haciendo scroll a 0px (top)...');
+            await page.evaluate(() => {
+                window.scrollTo(0, 0);
+            });
+            
+            // Esperar un poco después del scroll
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Agregar margin-top al body para tipo C
+            console.log('📐 Agregando margin-top: 100px al body...');
+            await page.evaluate(() => {
+                document.body.style.setProperty('margin-top', '100px', 'important');
+            });
+            
+            // Esperar un momento para que se aplique el estilo
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Insertar imagen top centrada horizontalmente
+            const insertResult = await page.evaluate((data) => {
+                return new Promise((resolve) => {
+                    const results = {
+                        top: { found: false, inserted: false, error: null }
+                    };
+                    
+                    // Insertar imagen top si existe
+                    if (data.imagenTop) {
+                        const imgTop = document.createElement('img');
+                        imgTop.crossOrigin = 'anonymous';
+                        imgTop.src = data.imagenTop;
+                        imgTop.style.position = 'fixed'; // Usar fixed para que no se vea afectada por el margin del body
+                        imgTop.style.left = '50%';
+                        imgTop.style.transform = 'translateX(-50%)';
+                        imgTop.style.top = '0px'; // Mantener en el top real
+                        imgTop.style.zIndex = '9999';
+                        imgTop.id = 'inserted-imagen-top-c';
+                        
+                        imgTop.onload = function() {
+                            results.top.inserted = true;
+                            results.top.position = { left: this.style.left, top: this.style.top };
+                            console.log('✅ Imagen top insertada en:', this.style.left, this.style.top);
+                            resolve(results);
+                        };
+                        
+                        imgTop.onerror = function() {
+                            results.top.error = 'Error al cargar imagen';
+                            console.error('❌ Error al cargar imagen top');
+                            resolve(results);
+                        };
+                        
+                        document.body.appendChild(imgTop);
+                    } else {
+                        results.top.error = 'No hay imagen top en los datos';
+                        resolve(results);
+                    }
+                    
+                    // Timeout de seguridad
+                    setTimeout(() => {
+                        resolve(results);
+                    }, 5000);
+                });
+            }, jsonData);
+            
+            console.log('📊 Resultado de inserción de imágenes tipo C:', JSON.stringify(insertResult, null, 2));
+            
+            // Esperar a que las imágenes se carguen completamente
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log('✅ Proceso de inserción de imágenes tipo C completado');
+        }
+
         console.log('📸 Tomando screenshot...');
         
         // Tomar screenshot
