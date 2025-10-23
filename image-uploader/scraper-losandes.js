@@ -341,6 +341,100 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             console.log('✅ Proceso de inserción de imágenes completado');
         }
 
+        // Si es tipo B desktop y hay datos JSON, insertar imagen lateral
+        if (deviceType === 'desktop' && visualizationType === 'B' && jsonData) {
+            console.log('🖼️ Insertando imágenes para visualización tipo B...');
+            
+            // Obtener la posición del elemento de referencia y hacer scroll
+            const scrollPosition = await page.evaluate(() => {
+                const referenceElement = document.querySelector('.row.news-article__small-listing-with-grouper-cont');
+                if (!referenceElement) {
+                    console.error('❌ No se encontró el elemento de referencia para tipo B');
+                    return null;
+                }
+                
+                const rect = referenceElement.getBoundingClientRect();
+                const scrollTop = window.scrollY + rect.top - 150;
+                
+                console.log('📍 Elemento encontrado, scrollTop calculado:', scrollTop);
+                return scrollTop;
+            });
+            
+            if (scrollPosition !== null) {
+                console.log(`📜 Haciendo scroll a ${scrollPosition}px...`);
+                await page.evaluate((scrollPos) => {
+                    window.scrollTo(0, scrollPos);
+                }, scrollPosition);
+                
+                // Esperar un poco después del scroll
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Insertar imagen lateral
+                const insertResult = await page.evaluate((data) => {
+                    return new Promise((resolve) => {
+                        const results = {
+                            lateral: { found: false, inserted: false, error: null }
+                        };
+                        
+                        // Obtener el elemento de referencia
+                        const referenceElement = document.querySelector('.row.news-article__small-listing-with-grouper-cont');
+                        
+                        if (!referenceElement) {
+                            results.lateral.error = 'No se encontró el elemento de referencia';
+                            console.error('❌ No se encontró el elemento de referencia para imagen lateral');
+                            resolve(results);
+                            return;
+                        }
+                        
+                        results.lateral.found = true;
+                        const refRect = referenceElement.getBoundingClientRect();
+                        results.lateral.refRect = refRect;
+                        console.log('✅ Elemento de referencia encontrado:', refRect);
+                        
+                        // Insertar imagen lateral si existe
+                        if (data.imagenLateral) {
+                            const imgLateral = document.createElement('img');
+                            imgLateral.crossOrigin = 'anonymous';
+                            imgLateral.src = data.imagenLateral;
+                            imgLateral.style.position = 'absolute';
+                            imgLateral.style.left = (refRect.right + 30 + window.scrollX) + 'px';
+                            imgLateral.style.top = (refRect.top + window.scrollY) + 'px';
+                            imgLateral.style.zIndex = '9999';
+                            imgLateral.id = 'inserted-imagen-lateral-b';
+                            
+                            imgLateral.onload = function() {
+                                results.lateral.inserted = true;
+                                results.lateral.position = { left: this.style.left, top: this.style.top };
+                                console.log('✅ Imagen lateral insertada en:', this.style.left, this.style.top);
+                                resolve(results);
+                            };
+                            
+                            imgLateral.onerror = function() {
+                                results.lateral.error = 'Error al cargar imagen';
+                                console.error('❌ Error al cargar imagen lateral');
+                                resolve(results);
+                            };
+                            
+                            document.body.appendChild(imgLateral);
+                        } else {
+                            resolve(results);
+                        }
+                        
+                        // Timeout de seguridad
+                        setTimeout(() => {
+                            resolve(results);
+                        }, 5000);
+                    });
+                }, jsonData);
+                
+                console.log('📊 Resultado de inserción de imágenes tipo B:', JSON.stringify(insertResult, null, 2));
+                
+                // Esperar a que las imágenes se carguen completamente
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                console.log('✅ Proceso de inserción de imágenes tipo B completado');
+            }
+        }
+
         console.log('📸 Tomando screenshot...');
         
         // Tomar screenshot
