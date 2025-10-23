@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Carga de Imágenes Publicitarias</title>
+  
+  <!-- Materialize CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <!-- Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <!-- Flatpickr CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <nav class="blue darken-2">
+    <div class="nav-wrapper container">
+      <a href="#" class="brand-logo">
+        <i class="material-icons">image</i>
+        Carga de Imágenes
+      </a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="section">
+      <h4 class="center-align">Sistema de Carga de Imágenes Publicitarias</h4>
+      
+      <!-- Selector de Dispositivo y Rangos de Fecha -->
+      <div class="row">
+        <div class="col s12 m6">
+          <div class="card blue-grey lighten-5">
+            <div class="card-content">
+              <span class="card-title">
+                <i class="material-icons left">devices</i>
+                Tipo de Dispositivo
+              </span>
+              <p>
+                <label>
+                  <input name="deviceType" type="radio" value="desktop" checked />
+                  <span>Desktop</span>
+                </label>
+              </p>
+              <p>
+                <label>
+                  <input name="deviceType" type="radio" value="mobile" />
+                  <span>Mobile</span>
+                </label>
+              </p>
+            </div>
+          </div>
+          
+          <!-- Opciones de Visualización Desktop -->
+          <div class="card teal lighten-5" id="desktopVisualizationOptions">
+            <div class="card-content">
+              <span class="card-title">
+                <i class="material-icons left">view_module</i>
+                Tipo de Visualización (Desktop)
+              </span>
+              <p>
+                <label>
+                  <input name="visualizationType" type="radio" value="A" checked />
+                  <span>Lateral y Ancho (A)</span>
+                </label>
+              </p>
+              <p>
+                <label>
+                  <input name="visualizationType" type="radio" value="B" />
+                  <span>Lateral (B)</span>
+                </label>
+              </p>
+              <p>
+                <label>
+                  <input name="visualizationType" type="radio" value="C" />
+                  <span>Top (C)</span>
+                </label>
+              </p>
+              <p>
+                <label>
+                  <input name="visualizationType" type="radio" value="D" />
+                  <span>ITT (D)</span>
+                </label>
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col s12 m6">
+          <div class="card green lighten-5">
+            <div class="card-content">
+              <span class="card-title">
+                <i class="material-icons left">date_range</i>
+                Rango de Fechas
+              </span>
+              
+              <div class="input-field">
+                <i class="material-icons prefix">event</i>
+                <input type="text" id="dateRange" class="datepicker-range" placeholder="Selecciona rango de fechas">
+                <label for="dateRange">Rango de Fechas</label>
+              </div>
+              
+              <div id="selectedDates" style="margin-top: 10px;">
+                <p class="grey-text text-darken-2"><small>El rango de fechas seleccionado aparecerá aquí</small></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botón Generar Screenshot -->
+      <div class="row">
+        <div class="col s12">
+          <div class="card purple lighten-5">
+            <div class="card-content">
+              <span class="card-title">
+                <i class="material-icons left">camera_alt</i>
+                Captura de Pantalla Los Andes
+              </span>
+              <p class="grey-text">Genera un screenshot de la página de Los Andes con el tipo de dispositivo seleccionado arriba.</p>
+              <div class="center-align" style="margin-top: 15px;">
+                <button id="generateScreenshotBtn" class="btn-large waves-effect waves-light purple darken-2">
+                  <i class="material-icons left">camera</i>
+                  Generar Screenshot
+                </button>
+              </div>
+              <div id="screenshotLoading" class="center-align" style="display: none; margin-top: 20px;">
+                <div class="preloader-wrapper small active">
+                  <div class="spinner-layer spinner-purple-only">
+                    <div class="circle-clipper left">
+                      <div class="circle"></div>
+                    </div>
+                    <div class="gap-patch">
+                      <div class="circle"></div>
+                    </div>
+                    <div class="circle-clipper right">
+                      <div class="circle"></div>
+                    </div>
+                  </div>
+                </div>
+                <p class="purple-text">Generando screenshot... Esto puede tomar unos segundos</p>
+              </div>
+              <div id="screenshotResult" style="margin-top: 15px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form id="uploadForm" enctype="multipart/form-data">
+        <!-- Imagen Lateral -->
+        <div class="row">
+          <div class="col s12">
+            <div class="card">
+              <div class="card-content">
+                <span class="card-title">
+                  <i class="material-icons left">view_sidebar</i>
+                  Imagen Lateral
+                </span>
+                <p class="grey-text">Tamaños permitidos: 300x250, 300x600, 160x600</p>
+                
+                <div class="file-field input-field">
+                  <div class="btn blue">
+                    <span>Seleccionar</span>
+                    <input type="file" id="imagenLateral" name="imagenLateral" accept="image/*">
+                  </div>
+                  <div class="file-path-wrapper">
+                    <input class="file-path validate" type="text" placeholder="Selecciona una imagen">
+                  </div>
+                </div>
+                
+                <div class="preview-container" id="preview-imagenLateral">
+                  <!-- Preview se mostrará aquí -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Imagen Ancho -->
+        <div class="row">
+          <div class="col s12">
+            <div class="card">
+              <div class="card-content">
+                <span class="card-title">
+                  <i class="material-icons left">view_week</i>
+                  Imagen Ancho
+                </span>
+                <p class="grey-text device-sizes">
+                  <span class="desktop-size">Desktop: 728x90, 990x90, 970x250</span>
+                  <span class="mobile-size" style="display: none;">Mobile: 320x50, 320x100, 300x100</span>
+                </p>
+                
+                <div class="file-field input-field">
+                  <div class="btn blue">
+                    <span>Seleccionar</span>
+                    <input type="file" id="imagenAncho" name="imagenAncho" accept="image/*">
+                  </div>
+                  <div class="file-path-wrapper">
+                    <input class="file-path validate" type="text" placeholder="Selecciona una imagen">
+                  </div>
+                </div>
+                
+                <div class="preview-container" id="preview-imagenAncho">
+                  <!-- Preview se mostrará aquí -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Imagen Top -->
+        <div class="row">
+          <div class="col s12">
+            <div class="card">
+              <div class="card-content">
+                <span class="card-title">
+                  <i class="material-icons left">vertical_align_top</i>
+                  Imagen Top
+                </span>
+                <p class="grey-text">Tamaños permitidos: 728x90, 990x90</p>
+                
+                <div class="file-field input-field">
+                  <div class="btn blue">
+                    <span>Seleccionar</span>
+                    <input type="file" id="imagenTop" name="imagenTop" accept="image/*">
+                  </div>
+                  <div class="file-path-wrapper">
+                    <input class="file-path validate" type="text" placeholder="Selecciona una imagen">
+                  </div>
+                </div>
+                
+                <div class="preview-container" id="preview-imagenTop">
+                  <!-- Preview se mostrará aquí -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ITT -->
+        <div class="row">
+          <div class="col s12">
+            <div class="card">
+              <div class="card-content">
+                <span class="card-title">
+                  <i class="material-icons left">crop_portrait</i>
+                  ITT (Interstitial)
+                </span>
+                <p class="grey-text device-sizes">
+                  <span class="desktop-size">Desktop: 800x600</span>
+                  <span class="mobile-size" style="display: none;">Mobile: 320x480</span>
+                </p>
+                
+                <div class="file-field input-field">
+                  <div class="btn blue">
+                    <span>Seleccionar</span>
+                    <input type="file" id="itt" name="itt" accept="image/*">
+                  </div>
+                  <div class="file-path-wrapper">
+                    <input class="file-path validate" type="text" placeholder="Selecciona una imagen">
+                  </div>
+                </div>
+                
+                <div class="preview-container" id="preview-itt">
+                  <!-- Preview se mostrará aquí -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Zócalo (Solo Mobile) -->
+        <div class="row" id="zocalo-section" style="display: none;">
+          <div class="col s12">
+            <div class="card orange lighten-4">
+              <div class="card-content">
+                <span class="card-title">
+                  <i class="material-icons left">vertical_align_bottom</i>
+                  Zócalo (Solo Mobile)
+                </span>
+                <p class="grey-text">Tamaños permitidos: 320x100, 320x50</p>
+                
+                <div class="file-field input-field">
+                  <div class="btn orange darken-2">
+                    <span>Seleccionar</span>
+                    <input type="file" id="zocalo" name="zocalo" accept="image/*">
+                  </div>
+                  <div class="file-path-wrapper">
+                    <input class="file-path validate" type="text" placeholder="Selecciona una imagen">
+                  </div>
+                </div>
+                
+                <div class="preview-container" id="preview-zocalo">
+                  <!-- Preview se mostrará aquí -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="row">
+          <div class="col s12 center-align">
+            <button type="submit" class="btn-large waves-effect waves-light green" id="submitBtn">
+              <i class="material-icons left">cloud_upload</i>
+              Subir Imágenes
+            </button>
+            <button type="button" class="btn-large waves-effect waves-light red" id="clearBtn">
+              <i class="material-icons left">clear</i>
+              Limpiar Todo
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <!-- Mensaje de Resultado -->
+      <div id="resultMessage" class="row" style="display: none;">
+        <div class="col s12">
+          <div class="card-panel">
+            <span id="resultText"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Galería de Imágenes del Día -->
+      <div class="row">
+        <div class="col s12">
+          <div class="card">
+            <div class="card-content">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <span class="card-title" style="margin: 0;">
+                  <i class="material-icons left">photo_library</i>
+                  Imágenes del Día
+                </span>
+                <label>
+                  <input type="checkbox" id="showImagesCheckbox" checked />
+                  <span>Mostrar imágenes</span>
+                </label>
+              </div>
+              
+              <div id="currentDateDisplay" style="margin-bottom: 15px;">
+                <p class="grey-text">
+                  <i class="material-icons tiny" style="vertical-align: middle;">today</i>
+                  <strong>Fecha actual:</strong> <span id="displayDate"></span>
+                </p>
+              </div>
+              
+              <div id="imageGallery" class="row">
+                <div class="col s12 center-align">
+                  <p class="grey-text">Selecciona una fecha para ver las imágenes</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="page-footer blue darken-2">
+    <div class="footer-copyright">
+      <div class="container center-align">
+        © 2025 Sistema de Carga de Imágenes Publicitarias
+      </div>
+    </div>
+  </footer>
+
+  <!-- Materialize JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <!-- Flatpickr JS -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+  <!-- Custom JS -->
+  <script src="js/app.js"></script>
+</body>
+</html>
