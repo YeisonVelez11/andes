@@ -820,18 +820,25 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         const visualizationSuffix = visualizationType ? `-${visualizationType}` : '';
         const fileName = `${timestamp}${visualizationSuffix}.png`;
 
-        // Guardar localmente primero (opcional, para backup)
-        const localPath = path.join(__dirname, 'screenshots', fileName);
+        // ============================================================
+        // GUARDADO LOCAL DESHABILITADO
+        // ============================================================
+        // Los screenshots NO se guardan en disco local.
+        // Se suben directamente a Google Drive desde memoria.
+        // ============================================================
         
-        // Crear directorio si no existe
-        if (!fs.existsSync(path.join(__dirname, 'screenshots'))) {
-            fs.mkdirSync(path.join(__dirname, 'screenshots'), { recursive: true });
-        }
-        
-        fs.writeFileSync(localPath, finalScreenshot);
-        console.log(`✅ Screenshot guardado localmente: ${localPath}`);
+        // COMENTADO: Guardar localmente (ya no se usa)
+        // const localPath = path.join(__dirname, 'screenshots', fileName);
+        // 
+        // // Crear directorio si no existe
+        // if (!fs.existsSync(path.join(__dirname, 'screenshots'))) {
+        //     fs.mkdirSync(path.join(__dirname, 'screenshots'), { recursive: true });
+        // }
+        // 
+        // fs.writeFileSync(localPath, finalScreenshot);
+        // console.log(`✅ Screenshot guardado localmente: ${localPath}`);
 
-        // Subir a Google Drive
+        // Subir a Google Drive (directamente desde memoria)
         console.log('☁️  Subiendo a Google Drive...');
         const auth = await authorize();
         const driveClient = google.drive({ version: 'v3', auth });

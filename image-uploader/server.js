@@ -179,10 +179,18 @@ function generateDateRange(startDate, endDate) {
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
-app.use('/screenshots', express.static('screenshots'));
+// COMENTADO: Ya no se guardan screenshots localmente
+// app.use('/screenshots', express.static('screenshots'));
 
-// Configuración de Multer para almacenamiento en memoria (sin guardar localmente)
-const storage = multer.memoryStorage();
+// ============================================================
+// CONFIGURACIÓN DE MULTER - ALMACENAMIENTO EN MEMORIA
+// ============================================================
+// IMPORTANTE: Los archivos NO se guardan en disco local.
+// Se almacenan temporalmente en memoria (RAM) y se suben
+// directamente a Google Drive. Después se liberan de memoria.
+// ============================================================
+
+const storage = multer.memoryStorage(); // Almacenamiento en memoria (NO en disco)
 
 // Filtro para validar tipos de archivo
 const fileFilter = (req, file, cb) => {
@@ -197,14 +205,18 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Configurar multer
+// Configurar multer con almacenamiento en memoria
 const upload = multer({
-  storage: storage,
+  storage: storage, // memoryStorage: NO guarda archivos localmente
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB máximo por archivo
   },
   fileFilter: fileFilter
 });
+
+// NOTA: Si existe una carpeta 'uploads/' con archivos, son de ejecuciones
+// anteriores y pueden ser eliminados manualmente. El código actual NO
+// guarda archivos en esa carpeta.
 
 // Definir los campos de archivo esperados
 const uploadFields = upload.fields([
