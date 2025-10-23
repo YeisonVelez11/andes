@@ -506,8 +506,11 @@ app.get('/image/:fileId', async (req, res) => {
     // Pipe el stream de Drive a la respuesta
     response.data.pipe(res);
   } catch (error) {
-    console.error('Error al obtener imagen de Drive:', error.message);
-    res.status(404).send('Imagen no encontrada');
+    console.error(`Error al obtener imagen de Drive (${fileId}):`, error.message);
+    // Enviar una imagen transparente 1x1 en caso de error
+    const transparentPixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+    res.setHeader('Content-Type', 'image/png');
+    res.send(transparentPixel);
   }
 });
 

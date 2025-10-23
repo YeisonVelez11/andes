@@ -509,6 +509,155 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             console.log('✅ Proceso de inserción de imágenes tipo C completado');
         }
 
+        // Si es tipo D desktop y hay datos JSON, crear overlay con imagen ITT
+        if (deviceType === 'desktop' && visualizationType === 'D' && jsonData) {
+            console.log('🖼️ Insertando imágenes para visualización tipo D...');
+            
+            // Hacer scroll a 0px
+            console.log('📜 Haciendo scroll a 0px...');
+            await page.evaluate(() => {
+                window.scrollTo(0, 0);
+            });
+            
+            // Esperar un poco después del scroll
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Leer la imagen x_itt.png y convertirla a base64
+            const xIconPath = path.join(__dirname, 'public', 'images', 'x_itt.png');
+            const xIconBuffer = fs.readFileSync(xIconPath);
+            const xIconBase64 = `data:image/png;base64,${xIconBuffer.toString('base64')}`;
+            console.log('📷 Imagen x_itt cargada como base64');
+            
+            // Crear overlay con background gris e imágenes
+            const insertResult = await page.evaluate((data, xIconSrc) => {
+                return new Promise((resolve) => {
+                    const results = {
+                        overlay: { created: false, error: null },
+                        itt: { inserted: false, error: null },
+                        closeIcon: { inserted: false, error: null }
+                    };
+                    
+                    try {
+                        // Crear overlay con background gris
+                        const overlay = document.createElement('div');
+                        overlay.id = 'itt-overlay';
+                        overlay.style.position = 'fixed';
+                        overlay.style.top = '0';
+                        overlay.style.left = '0';
+                        overlay.style.width = '100vw';
+                        overlay.style.height = '100vh';
+                        overlay.style.backgroundColor = 'rgba(51, 51, 51, 0.85)';
+                        overlay.style.zIndex = '99999';
+                        overlay.style.display = 'flex';
+                        overlay.style.justifyContent = 'center';
+                        overlay.style.alignItems = 'center';
+                        
+                        document.body.appendChild(overlay);
+                        results.overlay.created = true;
+                        console.log('✅ Overlay creado con opacidad 0.85');
+                        
+                        // Contenedor para la imagen ITT y el icono X
+                        const imageContainer = document.createElement('div');
+                        imageContainer.style.position = 'relative';
+                        imageContainer.style.maxWidth = '90%';
+                        imageContainer.style.maxHeight = '90%';
+                        imageContainer.style.display = 'flex';
+                        imageContainer.style.justifyContent = 'center';
+                        imageContainer.style.alignItems = 'center';
+                        
+                        overlay.appendChild(imageContainer);
+                        
+                        // Insertar imagen ITT centrada si existe
+                        if (data.itt) {
+                            const imgITT = document.createElement('img');
+                            imgITT.crossOrigin = 'anonymous';
+                            imgITT.src = data.itt;
+                            imgITT.style.maxWidth = '100%';
+                            imgITT.style.maxHeight = '100%';
+                            imgITT.style.objectFit = 'contain';
+                            imgITT.id = 'inserted-imagen-itt';
+                            
+                            imgITT.onload = function() {
+                                results.itt.inserted = true;
+                                console.log('✅ Imagen ITT insertada y centrada');
+                                
+                                // Obtener posición de la imagen ITT
+                                const imgRect = this.getBoundingClientRect();
+                                console.log('📍 Posición imagen ITT:', imgRect);
+                                
+                                // Insertar icono X en la esquina superior derecha de la imagen ITT
+                                const closeIcon = document.createElement('img');
+                                closeIcon.src = xIconSrc;
+                                closeIcon.style.position = 'fixed';
+                                closeIcon.style.zIndex = '100001';
+                                closeIcon.style.cursor = 'pointer';
+                                closeIcon.id = 'close-icon-itt';
+                                
+                                // Agregar al body
+                                document.body.appendChild(closeIcon);
+                                
+                                closeIcon.onload = function() {
+                                    const iconWidth = this.width;
+                                    const iconHeight = this.height;
+                                    
+                                    // Reducir el tamaño del icono al 70% (más pequeño)
+                                    const scaleFactor = 0.5;
+                                    const scaledWidth = iconWidth * scaleFactor;
+                                    const scaledHeight = iconHeight * scaleFactor;
+                                    
+                                    this.style.width = scaledWidth + 'px';
+                                    this.style.height = scaledHeight + 'px';
+                                    
+                                    // Posicionar: 10px arriba del top de la imagen ITT
+                                    // y alineado con el borde derecho de la imagen (5px desde el borde)
+                                    this.style.top = (imgRect.top - 10 - scaledHeight) + 'px';
+                                    this.style.left = ((imgRect.right - 5 - scaledWidth)  + 10 )+ 'px';
+                                    
+                                    results.closeIcon.inserted = true;
+                                    console.log('✅ Icono X insertado en:', this.style.left, this.style.top);
+                                    console.log('📏 Tamaño icono escalado:', scaledWidth + 'x' + scaledHeight);
+                                    resolve(results);
+                                };
+                                
+                                closeIcon.onerror = function() {
+                                    results.closeIcon.error = 'Error al cargar icono X';
+                                    console.error('❌ Error al cargar icono X');
+                                    resolve(results);
+                                };
+                            };
+                            
+                            imgITT.onerror = function() {
+                                results.itt.error = 'Error al cargar imagen ITT';
+                                console.error('❌ Error al cargar imagen ITT');
+                                resolve(results);
+                            };
+                            
+                            imageContainer.appendChild(imgITT);
+                        } else {
+                            results.itt.error = 'No hay imagen ITT en los datos';
+                            resolve(results);
+                        }
+                        
+                    } catch (error) {
+                        results.overlay.error = error.message;
+                        console.error('❌ Error creando overlay:', error);
+                        resolve(results);
+                    }
+                    
+                    // Timeout de seguridad
+                    setTimeout(() => {
+                        resolve(results);
+                    }, 5000);
+                });
+            }, jsonData, xIconBase64);
+            
+            console.log('📊 Resultado de inserción de imágenes tipo D:', JSON.stringify(insertResult, null, 2));
+            
+            // Esperar a que las imágenes se carguen completamente
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log('✅ Proceso de inserción de imágenes tipo D completado');
+        }
+
         console.log('📸 Tomando screenshot...');
         
         // Tomar screenshot
