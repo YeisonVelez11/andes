@@ -84,38 +84,51 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             isLandscape: true
         };
 
+        console.log('🔧 Configurando Puppeteer...');
+        
         // Configuración antibaneo de Puppeteer (compatible con Linux sin GUI)
-        browser = await puppeteer.launch({
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--single-process',
-                '--no-zygote',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--disable-gpu',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
-                `--window-size=${viewportConfig.width},${viewportConfig.height}`
-            ],
-            defaultViewport: viewportConfig,
-            executablePath: puppeteer.executablePath(),
-            protocolTimeout: 180000, // 3 minutos
-            ignoreHTTPSErrors: true,
-            dumpio: false
-        });
+        try {
+            browser = await puppeteer.launch({
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--single-process',
+                    '--no-zygote',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--disable-gpu',
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor',
+                    `--window-size=${viewportConfig.width},${viewportConfig.height}`
+                ],
+                defaultViewport: viewportConfig,
+                executablePath: puppeteer.executablePath(),
+                protocolTimeout: 180000, // 3 minutos
+                ignoreHTTPSErrors: true,
+                dumpio: false
+            });
+            console.log('✅ Navegador Puppeteer lanzado exitosamente');
+        } catch (launchError) {
+            console.error('❌ Error al lanzar Puppeteer:', launchError.message);
+            console.error('Stack:', launchError.stack);
+            throw launchError;
+        }
 
+        console.log('📄 Creando nueva página...');
         const page = await browser.newPage();
+        console.log('✅ Página creada exitosamente');
 
+        console.log('🔧 Configurando User Agent y headers...');
         // Configuraciones adicionales antibaneo
         const userAgent = isMobile 
             ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
             : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
         await page.setUserAgent(userAgent);
+        console.log(`✅ User Agent configurado: ${isMobile ? 'Mobile' : 'Desktop'}`);
         
         // Agregar header para ngrok
         await page.setExtraHTTPHeaders({
@@ -1585,7 +1598,9 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         return result;
 
     } catch (error) {
-        console.error('❌ Error durante el scraping:', error);
+        console.error('❌ Error durante el scraping:', error.message);
+        console.error('📍 Stack trace:', error.stack);
+        console.error('📊 Error completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         throw error;
     } finally {
         if (browser) {
