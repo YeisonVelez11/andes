@@ -386,8 +386,10 @@ function createImagePreview(file, inputId) {
       // Limpiar preview anterior
       previewContainer.innerHTML = '';
       
-      // Validar dimensiones
-      const isValidSize = validateImageSize(img.width, img.height, inputId);
+      // VALIDACIÓN DE DIMENSIONES COMENTADA
+      // Descomentar estas líneas si se desea validar los tamaños de las imágenes
+      // const isValidSize = validateImageSize(img.width, img.height, inputId);
+      const isValidSize = true; // Siempre válido (validación deshabilitada)
       
       // Crear elementos de preview
       const wrapper = document.createElement('div');
@@ -431,15 +433,16 @@ function createImagePreview(file, inputId) {
       wrapper.appendChild(info);
       previewContainer.appendChild(wrapper);
       
-      // Mostrar mensaje si el tamaño no es válido
-      if (!isValidSize) {
-        const validSizesText = getValidSizesText(inputId);
-        M.toast({ 
-          html: `⚠️ La imagen no tiene un tamaño válido. Tamaños permitidos: ${validSizesText}`, 
-          classes: 'orange darken-2',
-          displayLength: 6000
-        });
-      }
+      // MENSAJE DE VALIDACIÓN COMENTADO
+      // Descomentar estas líneas si se desea mostrar advertencias de tamaño
+      // if (!isValidSize) {
+      //   const validSizesText = getValidSizesText(inputId);
+      //   M.toast({ 
+      //     html: `⚠️ La imagen no tiene un tamaño válido. Tamaños permitidos: ${validSizesText}`, 
+      //     classes: 'orange darken-2',
+      //     displayLength: 6000
+      //   });
+      // }
     };
   };
   

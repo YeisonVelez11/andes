@@ -1385,7 +1385,11 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 { input: textOverlay, top: 0, left: 0 },
                 { input: screenshotBuffer, top: actualBarHeight, left: 0 }
             ])
-            .png()
+            .png({
+                compressionLevel: 9,
+                quality: 90,
+                effort: 10
+            })
             .toBuffer();
             
             console.log('✅ Barra de Chrome con fecha y hora agregada al screenshot');
@@ -1487,7 +1491,11 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 { input: textOverlay, top: 0, left: 0 }, // Texto de fecha encima
                 { input: finalScreenshotBuffer, top: screenshotTop, left: screenshotLeft } // Screenshot posicionado
             ])
-            .png()
+            .png({
+                compressionLevel: 9,
+                quality: 90,
+                effort: 10
+            })
             .toBuffer();
             
             console.log('✅ Navegador_full y screenshot mobile combinados');
@@ -1495,8 +1503,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             }
         }
 
-        // Generar nombre de archivo con timestamp, tipo de dispositivo y visualización
-        // Formato: YYYY-MM-DD-HH-MM-SS-[tipo_visualizacion].png
+        // Generar nombre de archivo con timestamp, tipo de visualización y deviceType
+        // Formato: YYYY-MM-DD-HH-MM-SS-[tipo_visualizacion]-[deviceType].png
         const now = new Date();
         
         // Si hay targetDate (fecha pasada), usar esa fecha en lugar de la actual
@@ -1517,9 +1525,10 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         const seconds = String(now.getSeconds()).padStart(2, '0');
         const timestamp = `${year}-${month}-${day}-${hours}-${minutes}-${seconds}`;
         
-        // Agregar tipo de visualización al nombre si está definido
+        // Agregar tipo de visualización y deviceType al nombre
         const visualizationSuffix = visualizationType ? `-${visualizationType}` : '';
-        const fileName = `${timestamp}${visualizationSuffix}.png`;
+        const deviceSuffix = `-${deviceType}`;
+        const fileName = `${timestamp}${visualizationSuffix}${deviceSuffix}.png`;
 
         // ============================================================
         // GUARDADO LOCAL DESHABILITADO
