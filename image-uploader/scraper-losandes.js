@@ -69,8 +69,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         // Configuración de viewport según tipo de dispositivo
         const isMobile = deviceType === 'mobile';
         const viewportConfig = isMobile ? {
-            width: 375,
-            height: 812,
+            width: 400,
+            height: 820,
             deviceScaleFactor: 2,
             isMobile: true,
             hasTouch: true,
@@ -1477,7 +1477,7 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             // Calcular posición para centrar el screenshot en la mitad de navegador_full
             // y luego moverlo 170px a la izquierda y 70px hacia abajo
             const screenshotLeft = Math.round((navegadorFullWidth - finalScreenshotWidth) / 2) - 170;
-            const screenshotTop = Math.round((navegadorFullHeight - finalScreenshotHeight) / 2) + 70;
+            const screenshotTop = Math.round((navegadorFullHeight - finalScreenshotHeight) / 2) + 50;
             
             console.log(`📍 Screenshot posicionado (170px izq, 70px abajo del centro): left=${screenshotLeft}px, top=${screenshotTop}px`);
             
