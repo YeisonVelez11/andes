@@ -144,6 +144,16 @@ function handleDeviceTypeChange(e) {
     // Cambiar título a Mobile
     visualizationCardTitle.innerHTML = '<i class="material-icons left">smartphone</i>Tipo de Visualización (Mobile)';
     
+    // Actualizar labels para mobile
+    document.getElementById('labelVisualizationA').textContent = 'Banner Ancho (A)';
+    document.getElementById('labelVisualizationB').textContent = 'Banner Top / Zócalo (B)';
+    document.getElementById('labelVisualizationC').textContent = 'ITT (C)';
+    
+    // Actualizar imágenes de preview para mobile
+    document.getElementById('previewImageA').src = '/screenshots/mobileA.png';
+    document.getElementById('previewImageB').src = '/screenshots/mobileB.png';
+    document.getElementById('previewImageC').src = '/screenshots/mobileC.png';
+    
     // Ocultar opción D (ITT)
     visualizationOptionD.style.display = 'none';
     
@@ -156,6 +166,16 @@ function handleDeviceTypeChange(e) {
   } else {
     // Cambiar título a Desktop
     visualizationCardTitle.innerHTML = '<i class="material-icons left">view_module</i>Tipo de Visualización (Desktop)';
+    
+    // Actualizar labels para desktop
+    document.getElementById('labelVisualizationA').textContent = 'Lateral / Ancho (A)';
+    document.getElementById('labelVisualizationB').textContent = 'Lateral (B)';
+    document.getElementById('labelVisualizationC').textContent = 'Top (C)';
+    
+    // Actualizar imágenes de preview para desktop
+    document.getElementById('previewImageA').src = '/screenshots/2025-10-23-10-22-39-A.png';
+    document.getElementById('previewImageB').src = '/screenshots/2025-10-23-10-22-51-B.png';
+    document.getElementById('previewImageC').src = '/screenshots/2025-10-23-10-23-03-C.png';
     
     // Mostrar opción D (ITT)
     visualizationOptionD.style.display = 'block';
