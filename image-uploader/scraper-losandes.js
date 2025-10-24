@@ -84,16 +84,17 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             isLandscape: true
         };
 
-        // Configuración antibaneo de Puppeteer
+        // Configuración antibaneo de Puppeteer (compatible con Linux sin GUI)
         browser = await puppeteer.launch({
-            headless: false, // Mostrar el navegador
+            headless: true,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
+                '--single-process',
+                '--no-zygote',
                 '--disable-dev-shm-usage',
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
-                '--no-zygote',
                 '--disable-gpu',
                 '--disable-blink-features=AutomationControlled',
                 '--disable-features=IsolateOrigins,site-per-process',
@@ -102,6 +103,7 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 `--window-size=${viewportConfig.width},${viewportConfig.height}`
             ],
             defaultViewport: viewportConfig,
+            executablePath: puppeteer.executablePath(),
             protocolTimeout: 180000, // 3 minutos
             ignoreHTTPSErrors: true,
             dumpio: false
@@ -152,7 +154,7 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             try {
                 // Conectar con Google Drive
                 const driveClient = google.drive({ version: 'v3', auth: await authorize() });
-                const htmlFolderId = '1oxJv2q0M8vwvbmVErg95BjNO2fu2dKN9';
+                const htmlFolderId = '1SWuk-zjLFg40weIaJ_oF3PbPgPDDTy49';
                 const fileName = `${targetDate}_${deviceType}.html`;
                 
                 console.log(`🔍 Buscando archivo: ${fileName}`);
@@ -1071,10 +1073,10 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         }
         
         // ============================================================
-        // MOBILE - TIPO B: IMAGEN TOP Y ZÓCALO
+        // MOBILE - TIPO B: IMAGEN ANCHO Y ZÓCALO
         // ============================================================
         if (isMobile && visualizationType === 'B') {
-            console.log('🖼️ Insertando imagenTop y zócalo para mobile tipo B...');
+            console.log('🖼️ Insertando imagenAncho y zócalo para mobile tipo B...');
             
             // Hacer scroll al bottom del elemento .simple-news-column-without-image--mobile ANTES de insertar imágenes
             const scrollPosition = await page.evaluate(() => {
@@ -1110,11 +1112,11 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 console.log('📷 Imagen x.png cargada como base64');
             }
             
-            // Insertar imagenTop y zócalo
+            // Insertar imagenAncho y zócalo
             const insertResult = await page.evaluate((data, xIcon) => {
                 return new Promise((resolve) => {
                     const results = {
-                        top: { found: false, inserted: false, error: null },
+                        ancho: { found: false, inserted: false, error: null },
                         zocalo: { found: false, inserted: false, error: null }
                     };
                     
@@ -1122,17 +1124,17 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                         const targetElement = document.querySelector('.simple-news-column-without-image--mobile');
                         
                         if (!targetElement) {
-                            results.top.error = 'No se encontró el elemento .simple-news-column-without-image--mobile';
+                            results.ancho.error = 'No se encontró el elemento .simple-news-column-without-image--mobile';
                             results.zocalo.error = 'No se encontró el elemento .simple-news-column-without-image--mobile';
                             resolve(results);
                             return;
                         }
                         
-                        results.top.found = true;
+                        results.ancho.found = true;
                         results.zocalo.found = true;
                         
                         let imagesLoaded = 0;
-                        const totalImages = (data.imagenTop ? 1 : 0) + (data.zocalo ? 1 : 0);
+                        const totalImages = (data.imagenAncho ? 1 : 0) + (data.zocalo ? 1 : 0);
                         
                         function checkComplete() {
                             if (imagesLoaded >= totalImages) {
@@ -1140,22 +1142,22 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                             }
                         }
                         
-                        // 1. Insertar imagenTop debajo del elemento
-                        if (data.imagenTop) {
-                            const imgTop = document.createElement('img');
-                            imgTop.src = data.imagenTop;
-                            imgTop.style.position = 'fixed';
-                            imgTop.style.zIndex = '9999';
-                            imgTop.style.maxWidth = '100%';
-                            imgTop.style.height = 'auto';
-                            imgTop.style.display = 'block';
-                            imgTop.id = 'inserted-imagen-top';
+                        // 1. Insertar imagenAncho debajo del elemento
+                        if (data.imagenAncho) {
+                            const imgAncho = document.createElement('img');
+                            imgAncho.src = data.imagenAncho;
+                            imgAncho.style.position = 'fixed';
+                            imgAncho.style.zIndex = '9999';
+                            imgAncho.style.maxWidth = '100%';
+                            imgAncho.style.height = 'auto';
+                            imgAncho.style.display = 'block';
+                            imgAncho.id = 'inserted-imagen-ancho';
                             
-                            imgTop.onload = function() {
+                            imgAncho.onload = function() {
                                 const imgHeight = this.naturalHeight;
                                 const rect = targetElement.getBoundingClientRect();
                                 
-                                // Agregar margin-bottom al elemento del tamaño de imagenTop
+                                // Agregar margin-bottom al elemento del tamaño de imagenAncho
                                 targetElement.style.marginBottom = (imgHeight + 20) + 'px';
                                 console.log(`📏 Margin-bottom agregado al elemento: ${imgHeight}px`);
                                 
@@ -1166,15 +1168,15 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                                 
                                 document.body.appendChild(this);
                                 
-                                results.top.inserted = true;
-                                console.log('✅ ImagenTop insertada en mobile tipo B');
+                                results.ancho.inserted = true;
+                                console.log('✅ ImagenAncho insertada en mobile tipo B');
                                 imagesLoaded++;
                                 checkComplete();
                             };
                             
-                            imgTop.onerror = function() {
-                                results.top.error = 'Error al cargar imagenTop';
-                                console.error('❌ Error al cargar imagenTop');
+                            imgAncho.onerror = function() {
+                                results.ancho.error = 'Error al cargar imagenAncho';
+                                console.error('❌ Error al cargar imagenAncho');
                                 imagesLoaded++;
                                 checkComplete();
                             };
@@ -1188,7 +1190,7 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                             const zocaloContainer = document.createElement('div');
                             zocaloContainer.style.position = 'fixed';
                             zocaloContainer.style.bottom = '0px';
-                            zocaloContainer.style.padding = '10px 0px 10px 0px';
+                            zocaloContainer.style.padding = '10px 0px 20px 0px';
                             zocaloContainer.style.left = '0px';
                             zocaloContainer.style.width = '100%';
                             zocaloContainer.style.backgroundColor = 'white';

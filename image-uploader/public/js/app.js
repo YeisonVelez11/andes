@@ -61,7 +61,7 @@ let collapsibleInstance = null;
 
 // Variables para el selector de carpetas
 let folderNavigationStack = [];
-let currentFolderId = '1itJ-0q38UJ1hQTbck-qL7du9f-qnLm4z'; // Carpeta raíz
+let currentFolderId = '1norxhMEG62maIArwy-zjolxzPGsQoBzq'; // Carpeta raíz
 let selectedFolderId = null;
 let selectedFolderName = null;
 
@@ -146,7 +146,7 @@ function handleDeviceTypeChange(e) {
     
     // Actualizar labels para mobile
     document.getElementById('labelVisualizationA').textContent = 'Banner Ancho (A)';
-    document.getElementById('labelVisualizationB').textContent = 'Banner Top / Zócalo (B)';
+    document.getElementById('labelVisualizationB').textContent = 'Banner Ancho / Zócalo (B)';
     document.getElementById('labelVisualizationC').textContent = 'ITT (C)';
     
     // Actualizar imágenes de preview para mobile
@@ -251,8 +251,8 @@ function updateSectionVisibility() {
         anchoSection.style.display = 'block';
         if (zocaloSection) zocaloSection.style.display = 'none';
         break;
-      case 'B': // Zócalo + Top
-        topSection.style.display = 'block';
+      case 'B': // Banner Ancho + Zócalo
+        anchoSection.style.display = 'block';
         if (zocaloSection) zocaloSection.style.display = 'block';
         break;
       case 'C': // Solo ITT (igual que Desktop D)
@@ -518,6 +518,8 @@ async function handleFormSubmit(e) {
     M.toast({ html: 'Por favor selecciona un rango de fechas', classes: 'orange' });
     return;
   }
+  
+
   
   // Validar que una carpeta esté seleccionada
   if (!selectedFolderId || !selectedFolderName) {
@@ -1376,7 +1378,7 @@ function renderFolders(folders) {
           <i class="material-icons" style="vertical-align: middle; color: #FF9800;">folder</i>
           <span style="margin-left: 10px;">${folder.name}</span>
         </div>
-        <button class="btn-small orange" onclick="selectFolder('${folder.id}', '${folder.name.replace(/'/g, "\\'")}'); event.stopPropagation();">
+        <button type="button" class="btn-small orange" onclick="selectFolder('${folder.id}', '${folder.name.replace(/'/g, "\\'")}'); event.stopPropagation();">
           <i class="material-icons">check</i>
         </button>
       </li>

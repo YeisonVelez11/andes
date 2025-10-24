@@ -1,7 +1,16 @@
 # Sistema de Carga de Imágenes Publicitarias
 
 
+Ids de carpetas:
+const imagenes = "1bbkECY_axw5IttYjgVpRLmi6-EF80fZz";  // Imágenes de campañas
+const jsones = "1d40AKgKucYUY-CnSqcLd1v8uyXhElk33";     // Archivos JSON
+const capturas = "1So5xiyo-X--XqPK3lh2zZJz7qYOJIGRR";
+const htmlFolderId = '1SWuk-zjLFg40weIaJ_oF3PbPgPDDTy49'; // Páginas web HTML
+const parentId = '1norxhMEG62maIArwy-zjolxzPGsQoBzq'; // Carpeta raíz navegación
+let currentFolderId = '1norxhMEG62maIArwy-zjolxzPGsQoBzq'; // Carpeta raíz
 
+
+htmlFolderId
 
 Sistema responsive para cargar y previsualizar imágenes publicitarias con validación de formatos y tamaños.
 

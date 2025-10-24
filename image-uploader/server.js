@@ -12,9 +12,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Google Drive folder IDs
-const imagenes = "1LuybE4izyMOVB8I450DBC4ibhHab1KFJ";
-const jsones = "1O9Pq8XK-JI8eEvdrNYhaA-beSKAr1-sm";
-const capturas = "1pU3cEM7o0uzIvwSapmsF4YYX5lOiSYEs";
+const imagenes = "1bbkECY_axw5IttYjgVpRLmi6-EF80fZz";
+const jsones = "1d40AKgKucYUY-CnSqcLd1v8uyXhElk33";
+const capturas = "1So5xiyo-X--XqPK3lh2zZJz7qYOJIGRR";
 
 
 async function authorize() {
@@ -512,7 +512,7 @@ app.get('/folders', async (req, res) => {
   }
 
   try {
-    const parentId = req.query.parentId || '1itJ-0q38UJ1hQTbck-qL7du9f-qnLm4z'; // Carpeta raíz por defecto
+    const parentId = req.query.parentId || '1norxhMEG62maIArwy-zjolxzPGsQoBzq'; // Carpeta raíz por defecto
     
     const response = await driveClient.files.list({
       q: `'${parentId}' in parents and trashed=false and mimeType='application/vnd.google-apps.folder'`,
@@ -665,7 +665,7 @@ app.get('/image/:fileId', async (req, res) => {
 // Función para capturar y guardar HTML de Los Andes
 async function captureAndSaveHTML() {
   const puppeteer = require('puppeteer');
-  const htmlFolderId = '1oxJv2q0M8vwvbmVErg95BjNO2fu2dKN9';
+  const htmlFolderId = '1SWuk-zjLFg40weIaJ_oF3PbPgPDDTy49';
   const url = 'https://www.losandes.com.ar/';
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
   
@@ -696,8 +696,13 @@ async function captureAndSaveHTML() {
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage'
-        ]
+          '--single-process',
+          '--no-zygote',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-accelerated-2d-canvas'
+        ],
+        executablePath:puppeteer.executablePath()
       });
       
       const page = await browser.newPage();
@@ -807,6 +812,17 @@ app.post('/generate-screenshot', async (req, res) => {
     for (const dateToProcess of datesToProcess) {
       console.log(`\n📆 Procesando fecha DESKTOP: ${dateToProcess}`);
       
+      // Validar que la fecha no sea futura
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const processDate = new Date(dateToProcess + 'T00:00:00');
+      processDate.setHours(0, 0, 0, 0);
+      
+      if (processDate > today) {
+        console.log(`⏭️ Saltando fecha futura DESKTOP: ${dateToProcess} (no se pueden generar screenshots para fechas futuras)`);
+        continue;
+      }
+      
       const jsonFileName = `${dateToProcess}.json`;
       const existingFile = await findJsonFileByName(jsones, jsonFileName);
       
@@ -882,6 +898,17 @@ app.post('/generate-screenshot', async (req, res) => {
     
     for (const dateToProcess of datesToProcess) {
       console.log(`\n📆 Procesando fecha MOBILE: ${dateToProcess}`);
+      
+      // Validar que la fecha no sea futura
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const processDate = new Date(dateToProcess + 'T00:00:00');
+      processDate.setHours(0, 0, 0, 0);
+      
+      if (processDate > today) {
+        console.log(`⏭️ Saltando fecha futura MOBILE: ${dateToProcess} (no se pueden generar screenshots para fechas futuras)`);
+        continue;
+      }
       
       const jsonFileName = `${dateToProcess}.json`;
       const existingFile = await findJsonFileByName(jsones, jsonFileName);
