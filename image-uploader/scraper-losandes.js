@@ -1030,7 +1030,107 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             console.log(`📐 Dimensiones finales: ${screenshotWidth}x${newHeight} (original: ${screenshotWidth}x${screenshotHeight})`);
             }
         } else {
-            console.log('📱 Mobile: sin barra de Chrome');
+            console.log('📱 Mobile: agregando navegador_full.png y screenshot');
+            
+            // Obtener metadata del screenshot original
+            const screenshotMetadata = await sharp(screenshotBuffer).metadata();
+            const screenshotWidth = screenshotMetadata.width;
+            const screenshotHeight = screenshotMetadata.height;
+            
+            // Ruta de la imagen navegador_full.png
+            const navegadorFullPath = path.join(__dirname, 'public', 'images', 'navegador_full.png');
+            
+            // Verificar que exista la imagen
+            if (!fs.existsSync(navegadorFullPath)) {
+                console.warn('⚠️ No se encontró navegador_full.png, continuando sin navegador...');
+                finalScreenshot = screenshotBuffer;
+            } else {
+            
+            console.log(`📏 Screenshot mobile original: ${screenshotWidth}x${screenshotHeight}px`);
+            
+            // Cargar navegador_full.png en su tamaño original
+            const navegadorFullBuffer = await sharp(navegadorFullPath).toBuffer();
+            const navegadorFullMetadata = await sharp(navegadorFullBuffer).metadata();
+            const navegadorFullWidth = navegadorFullMetadata.width;
+            const navegadorFullHeight = navegadorFullMetadata.height;
+            
+            console.log(`📏 Navegador_full (original): ${navegadorFullWidth}x${navegadorFullHeight}px`);
+            
+            // Generar fecha para agregar sobre navegador_full
+            const dateToUse = targetDate ? new Date(targetDate + 'T00:00:00') : new Date();
+            const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+            const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+            
+            const diaSemana = diasSemana[dateToUse.getDay()];
+            const dia = dateToUse.getDate();
+            const mes = meses[dateToUse.getMonth()];
+            
+            const fecha = `${diaSemana} ${dia} de ${mes}.`;
+            console.log(`📅 Fecha para navegador mobile: ${fecha}${targetDate ? ' (fecha histórica)' : ''}`);
+            
+            // Escapar caracteres especiales para XML/SVG
+            const escapedFecha = fecha
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+            
+            // Crear SVG con el texto de fecha
+            const fontSize = Math.round(navegadorFullWidth * 0.008); // Reducido de 0.0095 a 0.008
+            const textColor = '#E5E5E5';
+            const textPadding = Math.round(navegadorFullWidth * 0.012);
+            
+            // Posicionar el texto en la parte superior (barra negra de Chrome)
+            const textVerticalPosition = 20; // Subido 10px (de 30 a 20)
+            
+            const svgText = `<svg width="${navegadorFullWidth}" height="${navegadorFullHeight}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <style type="text/css">
+            .datetime {
+                font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+                font-size: ${fontSize}px;
+                font-weight: 500;
+                fill: ${textColor};
+            }
+        </style>
+    </defs>
+    <text x="${navegadorFullWidth - textPadding}" y="${textVerticalPosition}" class="datetime" text-anchor="end">${escapedFecha}</text>
+</svg>`;
+            
+            const textOverlay = Buffer.from(svgText);
+            
+            // Redimensionar el screenshot a un tamaño fijo de 400x820px
+            const finalScreenshotWidth = 400;
+            const finalScreenshotHeight = 820;
+            
+            const finalScreenshotBuffer = await sharp(screenshotBuffer)
+                .resize(finalScreenshotWidth, finalScreenshotHeight, {
+                    fit: 'fill'
+                })
+                .toBuffer();
+            
+            console.log(`📏 Screenshot redimensionado a tamaño fijo: ${finalScreenshotWidth}x${finalScreenshotHeight}px`);
+            
+            // Calcular posición para centrar el screenshot en la mitad de navegador_full
+            // y luego moverlo 170px a la izquierda y 70px hacia abajo
+            const screenshotLeft = Math.round((navegadorFullWidth - finalScreenshotWidth) / 2) - 170;
+            const screenshotTop = Math.round((navegadorFullHeight - finalScreenshotHeight) / 2) + 70;
+            
+            console.log(`📍 Screenshot posicionado (170px izq, 70px abajo del centro): left=${screenshotLeft}px, top=${screenshotTop}px`);
+            
+            // Combinar navegador_full con el screenshot y la fecha encima
+            var finalScreenshot = await sharp(navegadorFullBuffer)
+            .composite([
+                { input: textOverlay, top: 0, left: 0 }, // Texto de fecha encima
+                { input: finalScreenshotBuffer, top: screenshotTop, left: screenshotLeft } // Screenshot posicionado
+            ])
+            .png()
+            .toBuffer();
+            
+            console.log('✅ Navegador_full y screenshot mobile combinados');
+            console.log(`📐 Dimensiones finales: ${navegadorFullWidth}x${navegadorFullHeight}`);
+            }
         }
 
         // Generar nombre de archivo con timestamp, tipo de dispositivo y visualización
