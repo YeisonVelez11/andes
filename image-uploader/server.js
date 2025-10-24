@@ -921,7 +921,7 @@ app.post('/generate-screenshot', async (req, res) => {
             imagenLateral: record.imagenLateral ? `${baseUrl}${record.imagenLateral}` : null,
             imagenAncho: record.imagenAncho ? `${baseUrl}${record.imagenAncho}` : null,
             imagenTop: record.imagenTop ? `${baseUrl}${record.imagenTop}` : null,
-            itt: null,
+            itt: record.itt ? `${baseUrl}${record.itt}` : null,
             zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null
           };
           

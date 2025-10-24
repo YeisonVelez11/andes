@@ -197,9 +197,9 @@ function handleVisualizationTypeChange(e) {
   clearHiddenSectionPreviews();
   
   const labels = {
-    'A': 'Lateral y Ancho',
-    'B': 'Lateral',
-    'C': 'Top',
+    'A': currentDeviceType === 'mobile' ? 'Ancho' : 'Lateral y Ancho',
+    'B': currentDeviceType === 'mobile' ? 'Top + Zócalo' : 'Lateral',
+    'C': currentDeviceType === 'mobile' ? 'ITT' : 'Top',
     'D': 'ITT'
   };
   
@@ -235,8 +235,8 @@ function updateSectionVisibility() {
         topSection.style.display = 'block';
         if (zocaloSection) zocaloSection.style.display = 'block';
         break;
-      case 'C': // Solo Top
-        topSection.style.display = 'block';
+      case 'C': // Solo ITT (igual que Desktop D)
+        ittSection.style.display = 'block';
         if (zocaloSection) zocaloSection.style.display = 'none';
         break;
     }
