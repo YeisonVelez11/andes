@@ -238,6 +238,16 @@ const uploadFields = upload.fields([
   { name: 'zocalo', maxCount: 1 }
 ]);
 
+// Health check endpoint (para Docker y monitoreo)
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    drive: driveClient ? 'connected' : 'disconnected'
+  });
+});
+
 // Ruta principal
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
