@@ -268,9 +268,9 @@ label {
 }
 
 /* Sección de zócalo destacada */
-#zocalo-section .card {
+/* #zocalo-section .card {
   border: 2px solid #ff9800;
-}
+} */
 
 /* Estilos para mensajes de error en inputs */
 .helper-text {
