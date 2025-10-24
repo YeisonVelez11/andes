@@ -225,15 +225,19 @@ function updateSectionVisibility() {
   
   if (currentDeviceType === 'mobile') {
     // Lógica para mobile
+    const zocaloSection = document.getElementById('zocalo-section');
     switch(currentVisualizationType) {
       case 'A': // Solo Ancho
         anchoSection.style.display = 'block';
+        if (zocaloSection) zocaloSection.style.display = 'none';
         break;
-      case 'B': // Solo Lateral
-        lateralSection.style.display = 'block';
+      case 'B': // Zócalo + Top
+        topSection.style.display = 'block';
+        if (zocaloSection) zocaloSection.style.display = 'block';
         break;
       case 'C': // Solo Top
         topSection.style.display = 'block';
+        if (zocaloSection) zocaloSection.style.display = 'none';
         break;
     }
   } else {

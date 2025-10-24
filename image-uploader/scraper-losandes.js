@@ -907,6 +907,206 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 console.log('⚠️ No se pudo hacer scroll al elemento mobile');
             }
         }
+        
+        // ============================================================
+        // MOBILE - TIPO B: IMAGEN TOP Y ZÓCALO
+        // ============================================================
+        if (isMobile && visualizationType === 'B') {
+            console.log('🖼️ Insertando imagenTop y zócalo para mobile tipo B...');
+            
+            // Hacer scroll al bottom del elemento .simple-news-column-without-image--mobile ANTES de insertar imágenes
+            const scrollPosition = await page.evaluate(() => {
+                const targetElement = document.querySelector('.simple-news-column-without-image--mobile');
+                if (!targetElement) {
+                    console.error('❌ No se encontró el elemento .simple-news-column-without-image--mobile');
+                    return null;
+                }
+                
+                const rect = targetElement.getBoundingClientRect();
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                // Scroll al bottom del elemento
+                return rect.bottom + scrollTop;
+            });
+            
+            if (scrollPosition !== null) {
+                console.log(`📜 Haciendo scroll al bottom del elemento: ${scrollPosition}px...`);
+                await page.evaluate((scrollPos) => {
+                    window.scrollTo(0, scrollPos - 200);
+                }, scrollPosition);
+                
+                // Esperar a que se complete el scroll
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                console.log('✅ Scroll completado');
+            }
+            
+            // Leer la imagen x.png y convertirla a base64
+            const xIconPath = path.join(__dirname, 'public', 'images', 'x.png');
+            let xIconBase64 = null;
+            if (fs.existsSync(xIconPath)) {
+                const xIconBuffer = fs.readFileSync(xIconPath);
+                xIconBase64 = `data:image/png;base64,${xIconBuffer.toString('base64')}`;
+                console.log('📷 Imagen x.png cargada como base64');
+            }
+            
+            // Insertar imagenTop y zócalo
+            const insertResult = await page.evaluate((data, xIcon) => {
+                return new Promise((resolve) => {
+                    const results = {
+                        top: { found: false, inserted: false, error: null },
+                        zocalo: { found: false, inserted: false, error: null }
+                    };
+                    
+                    try {
+                        const targetElement = document.querySelector('.simple-news-column-without-image--mobile');
+                        
+                        if (!targetElement) {
+                            results.top.error = 'No se encontró el elemento .simple-news-column-without-image--mobile';
+                            results.zocalo.error = 'No se encontró el elemento .simple-news-column-without-image--mobile';
+                            resolve(results);
+                            return;
+                        }
+                        
+                        results.top.found = true;
+                        results.zocalo.found = true;
+                        
+                        let imagesLoaded = 0;
+                        const totalImages = (data.imagenTop ? 1 : 0) + (data.zocalo ? 1 : 0);
+                        
+                        function checkComplete() {
+                            if (imagesLoaded >= totalImages) {
+                                resolve(results);
+                            }
+                        }
+                        
+                        // 1. Insertar imagenTop debajo del elemento
+                        if (data.imagenTop) {
+                            const imgTop = document.createElement('img');
+                            imgTop.src = data.imagenTop;
+                            imgTop.style.position = 'fixed';
+                            imgTop.style.zIndex = '9999';
+                            imgTop.style.maxWidth = '100%';
+                            imgTop.style.height = 'auto';
+                            imgTop.style.display = 'block';
+                            imgTop.id = 'inserted-imagen-top';
+                            
+                            imgTop.onload = function() {
+                                const imgHeight = this.naturalHeight;
+                                const rect = targetElement.getBoundingClientRect();
+                                
+                                // Agregar margin-bottom al elemento del tamaño de imagenTop
+                                targetElement.style.marginBottom = (imgHeight + 20) + 'px';
+                                console.log(`📏 Margin-bottom agregado al elemento: ${imgHeight}px`);
+                                
+                                // Posicionar debajo del elemento
+                                this.style.left = '50%';
+                                this.style.transform = 'translateX(-50%)';
+                                this.style.top = rect.bottom + 'px';
+                                
+                                document.body.appendChild(this);
+                                
+                                results.top.inserted = true;
+                                console.log('✅ ImagenTop insertada en mobile tipo B');
+                                imagesLoaded++;
+                                checkComplete();
+                            };
+                            
+                            imgTop.onerror = function() {
+                                results.top.error = 'Error al cargar imagenTop';
+                                console.error('❌ Error al cargar imagenTop');
+                                imagesLoaded++;
+                                checkComplete();
+                            };
+                        } else {
+                            imagesLoaded++;
+                        }
+                        
+                        // 2. Insertar zócalo al final de la página visible (bottom) con background blanco
+                        if (data.zocalo) {
+                            // Crear contenedor con background blanco
+                            const zocaloContainer = document.createElement('div');
+                            zocaloContainer.style.position = 'fixed';
+                            zocaloContainer.style.bottom = '0px';
+                            zocaloContainer.style.padding = '10px 0px 10px 0px';
+                            zocaloContainer.style.left = '0px';
+                            zocaloContainer.style.width = '100%';
+                            zocaloContainer.style.backgroundColor = 'white';
+                            zocaloContainer.style.zIndex = '9999';
+                            zocaloContainer.style.display = 'flex';
+                            zocaloContainer.style.justifyContent = 'center';
+                            zocaloContainer.style.alignItems = 'center';
+                            zocaloContainer.id = 'zocalo-container';
+                            
+                            const imgZocalo = document.createElement('img');
+                            imgZocalo.src = data.zocalo;
+                            imgZocalo.style.maxWidth = '100%';
+                            imgZocalo.style.height = 'auto';
+                            imgZocalo.style.display = 'block';
+                            imgZocalo.id = 'inserted-zocalo';
+                            
+                            imgZocalo.onload = function() {
+                                // Agregar imagen al contenedor
+                                zocaloContainer.appendChild(this);
+                                document.body.appendChild(zocaloContainer);
+                                
+                                // Agregar icono X en la esquina superior derecha del zócalo
+                                if (xIcon) {
+                                    // Esperar un momento para que el DOM se actualice
+                                    setTimeout(() => {
+                                        const xIconImg = document.createElement('img');
+                                        xIconImg.src = xIcon;
+                                        xIconImg.style.position = 'fixed';
+                                        xIconImg.style.zIndex = '10000';
+                                        xIconImg.style.width = '25px';
+                                        xIconImg.style.height = '25px';
+                                        
+                                        const zocaloRect = imgZocalo.getBoundingClientRect();
+                                        // Posicionar a la derecha de la página y 25px más arriba
+                                        xIconImg.style.right = '5px'; // A la derecha de la página
+                                        xIconImg.style.top = (zocaloRect.top - 25) + 'px'; // 5px más arriba (era -20, ahora -25)
+                                        
+                                        document.body.appendChild(xIconImg);
+                                        console.log('✅ Icono X agregado al zócalo (derecha de la página, 25px más arriba)');
+                                        console.log(`📍 Posición icono X: right=5px, top=${zocaloRect.top - 25}px`);
+                                    }, 100);
+                                }
+                                
+                                results.zocalo.inserted = true;
+                                console.log('✅ Zócalo insertado al final de la página visible con background blanco');
+                                imagesLoaded++;
+                                checkComplete();
+                            };
+                            
+                            imgZocalo.onerror = function() {
+                                results.zocalo.error = 'Error al cargar zócalo';
+                                console.error('❌ Error al cargar zócalo');
+                                imagesLoaded++;
+                                checkComplete();
+                            };
+                        } else {
+                            imagesLoaded++;
+                        }
+                        
+                        // Timeout de seguridad
+                        setTimeout(() => {
+                            resolve(results);
+                        }, 5000);
+                        
+                    } catch (error) {
+                        results.top.error = error.message;
+                        results.zocalo.error = error.message;
+                        console.error('❌ Error insertando imágenes:', error);
+                        resolve(results);
+                    }
+                });
+            }, jsonData, xIconBase64);
+            
+            console.log('📊 Resultado de inserción mobile tipo B:', JSON.stringify(insertResult, null, 2));
+            
+            // Esperar a que las imágenes se carguen completamente
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            console.log('✅ Proceso de inserción mobile tipo B completado');
+        }
 
         console.log('📸 Tomando screenshot...');
         
