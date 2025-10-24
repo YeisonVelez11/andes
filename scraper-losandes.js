@@ -84,34 +84,50 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             isLandscape: true
         };
 
-        console.log('🔧 Configurando Puppeteer...');
+        console.log('🔧 Configurando Puppeteer (modo bajo recursos)...');
         
-        // Configuración antibaneo de Puppeteer (compatible con Linux sin GUI)
+        // Configuración optimizada para instancias gratuitas con recursos limitados
         try {
             browser = await puppeteer.launch({
-                headless: true,
+                headless: 'new',
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
-                    '--single-process',
-                    '--no-zygote',
-                    '--disable-dev-shm-usage',
+                    '--disable-dev-shm-usage', // Crítico para instancias con poca RAM
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
+                    '--no-zygote',
                     '--disable-gpu',
+                    '--disable-software-rasterizer',
+                    '--disable-extensions',
+                    '--disable-background-networking',
+                    '--disable-default-apps',
+                    '--disable-sync',
+                    '--disable-translate',
+                    '--hide-scrollbars',
+                    '--metrics-recording-only',
+                    '--mute-audio',
+                    '--no-default-browser-check',
+                    '--safebrowsing-disable-auto-update',
                     '--disable-blink-features=AutomationControlled',
-                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--disable-features=IsolateOrigins,site-per-process,VizDisplayCompositor',
                     '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor',
+                    '--disable-site-isolation-trials',
+                    '--disable-features=AudioServiceOutOfProcess',
+                    '--renderer-process-limit=1', // Limitar procesos renderer
+                    '--max-old-space-size=512', // Limitar heap de V8
                     `--window-size=${viewportConfig.width},${viewportConfig.height}`
                 ],
                 defaultViewport: viewportConfig,
                 executablePath: puppeteer.executablePath(),
-                protocolTimeout: 180000, // 3 minutos
+                protocolTimeout: 180000,
                 ignoreHTTPSErrors: true,
-                dumpio: false
+                dumpio: false,
+                handleSIGINT: false,
+                handleSIGTERM: false,
+                handleSIGHUP: false
             });
-            console.log('✅ Navegador Puppeteer lanzado exitosamente');
+            console.log('✅ Navegador Puppeteer lanzado exitosamente (modo bajo recursos)');
         } catch (launchError) {
             console.error('❌ Error al lanzar Puppeteer:', launchError.message);
             console.error('Stack:', launchError.stack);

@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  andes:
+    build: .
+    container_name: andes-image-uploader
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+    # Memoria compartida mínima para instancia gratuita
+    shm_size: '512mb'
+    # Limitar recursos para instancia gratuita
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    # Logging reducido
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
