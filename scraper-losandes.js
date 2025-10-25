@@ -7,6 +7,7 @@ const streamifier = require('streamifier');
 const sharp = require('sharp');
 const { launchBrowser, configurePage, VIEWPORT_CONFIGS } = require('./puppeteer-config');
 const { getArgentinaDateTime, getArgentinaTimestamp } = require('./date-utils');
+const { navigateWithStrategies } = require('./navigation-strategies');
 
 /**
  * Autoriza y conecta con Google Drive API usando credenciales JWT
@@ -90,7 +91,7 @@ async function uploadBufferToDrive(driveClient, folderId, fileName, buffer, mime
  *   imagenAncho: 'https://example.com/img2.jpg'
  * }, '2025-10-20');
  */
-async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualizationType = null, jsonData = null, targetDate = null) {
+async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualizationType = null, jsonData = null, targetDate = null, attempt = 1, maxRetries = 5) {
     console.log('🚀 Iniciando scraper de Los Andes...');
     console.log(`📱 Tipo de dispositivo: ${deviceType}`);
     if (targetDate) {
@@ -233,21 +234,9 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         } else {
             console.log('🌐 Navegando a Los Andes (página en vivo)...');
             
-            // Navegar a la página con timeout extendido y manejo de errores
-            try {
-                await page.goto('https://www.losandes.com.ar/', {
-                    waitUntil: 'domcontentloaded',
-                    timeout: 90000
-                });
-                console.log('✅ Página cargada exitosamente');
-            } catch (navError) {
-                console.warn('⚠️ Error en navegación inicial, reintentando...');
-                await page.goto('https://www.losandes.com.ar/', {
-                    waitUntil: 'load',
-                    timeout: 90000
-                });
-                console.log('✅ Página cargada en segundo intento');
-            }
+            // Usar estrategias de navegación según el intento
+            await navigateWithStrategies(page, 'https://www.losandes.com.ar/', attempt, maxRetries);
+            console.log('✅ Página cargada exitosamente');
         }
 
         // Esperar un poco para que todo cargue completamente

@@ -9,6 +9,7 @@ const streamifier = require("streamifier");
 const { scrapeLosAndes } = require("./scraper-losandes");
 const { launchBrowser, configurePage } = require("./puppeteer-config");
 const { getArgentinaDateString } = require("./date-utils");
+const { navigateWithStrategies } = require("./navigation-strategies");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -807,6 +808,41 @@ app.get("/image/:fileId", async (req, res) => {
   }
 });
 
+
+/**
+ * Ejecuta scrapeLosAndes con reintentos agresivos y múltiples estrategias
+ * @param {string} deviceType - Tipo de dispositivo
+ * @param {string} targetFolderId - ID de carpeta destino
+ * @param {string} visualizationType - Tipo de visualización
+ * @param {Object} jsonData - Datos JSON con URLs de imágenes
+ * @param {string|null} targetDate - Fecha objetivo o null
+ * @param {number} maxRetries - Número máximo de reintentos (default: 5)
+ * @returns {Promise<Object>} Resultado del scraping
+ */
+async function scrapeLosAndesWithRetry(deviceType, targetFolderId, visualizationType, jsonData, targetDate, maxRetries = 5) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Intento ${attempt}/${maxRetries} para screenshot ${deviceType}`);
+      
+      // Llamar a scrapeLosAndes - las estrategias se manejan dentro de scraper-losandes.js
+      const result = await scrapeLosAndes(deviceType, targetFolderId, visualizationType, jsonData, targetDate, attempt, maxRetries);
+      console.log(`✅ Screenshot ${deviceType} exitoso en intento ${attempt}`);
+      return result;
+    } catch (error) {
+      console.log(`⚠️ Intento ${attempt}/${maxRetries} falló: ${error.message}`);
+      
+      if (attempt < maxRetries) {
+        const waitTime = attempt * 15000; // 15s, 30s, 45s, 60s
+        console.log(`⏳ Esperando ${waitTime/1000} segundos antes de reintentar...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } else {
+        console.log(`❌ Todos los intentos fallaron para screenshot ${deviceType}`);
+        throw error;
+      }
+    }
+  }
+}
+
 /**
  * Captura el HTML de Los Andes (desktop y mobile) y lo guarda en Google Drive
  * Usa la fecha actual de Argentina para nombrar los archivos
@@ -850,46 +886,15 @@ async function captureAndSaveHTML() {
       // Configurar página con user agent y headers
       console.log("🔧 Configurando página...");
       await configurePage(page, deviceType);
-      
-      // User agents alternativos para reintentos
-      const alternativeUserAgents = [
-        null, // Usar el default
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0'
-      ];
-      
       console.log("✅ Página configurada");
 
       // Navegar a la página con reintentos y diferentes estrategias
       console.log(`🌐 Navegando a ${url}...`);
-      let navigationSuccess = false;
       const maxRetries = 5;
-      const strategies = [
-        { waitUntil: "domcontentloaded", timeout: 90000, name: "domcontentloaded (90s)" },
-        { waitUntil: "domcontentloaded", timeout: 120000, name: "domcontentloaded (120s)" },
-        { waitUntil: "load", timeout: 120000, name: "load (120s)" },
-        { waitUntil: "networkidle0", timeout: 120000, name: "networkidle0 (120s)" },
-        { waitUntil: "domcontentloaded", timeout: 150000, name: "domcontentloaded (150s)" }
-      ];
       
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          const strategy = strategies[attempt - 1];
-          console.log(`📡 Intento ${attempt}/${maxRetries} - Estrategia: ${strategy.name}`);
-          
-          // Cambiar user agent en intentos posteriores
-          if (attempt > 1 && alternativeUserAgents[attempt - 1]) {
-            console.log(`🔄 Cambiando user agent...`);
-            await page.setUserAgent(alternativeUserAgents[attempt - 1]);
-          }
-          
-          await page.goto(url, {
-            waitUntil: strategy.waitUntil,
-            timeout: strategy.timeout,
-          });
-          navigationSuccess = true;
+          await navigateWithStrategies(page, url, attempt, maxRetries);
           console.log("✅ Página cargada exitosamente");
           break;
         } catch (navError) {
@@ -1136,12 +1141,13 @@ app.post("/generate-screenshot", async (req, res) => {
           
           console.log(`🔍 DESKTOP - dateToProcess: ${dateToProcess}, currentDate: ${currentDate}, targetDate: ${targetDate}`);
 
-          const result = await scrapeLosAndes(
+          const result = await scrapeLosAndesWithRetry(
             "desktop",
             targetFolderId,
             visualizationType,
             jsonDataForScraper,
-            targetDate
+            targetDate,
+            5 // 5 intentos con estrategias diferentes
           );
           allResults.desktop.push({
             ...result,
@@ -1251,12 +1257,13 @@ app.post("/generate-screenshot", async (req, res) => {
           // Obtener tipo de visualización del record (A, B, C para mobile)
           const visualizationType = record.tipo_visualizacion || null;
 
-          const result = await scrapeLosAndes(
+          const result = await scrapeLosAndesWithRetry(
             "mobile",
             targetFolderId,
             visualizationType,
             jsonDataForScraper,
-            targetDate
+            targetDate,
+            5 // 5 intentos con estrategias diferentes
           );
           allResults.mobile.push({
             ...result,
@@ -1281,14 +1288,34 @@ app.post("/generate-screenshot", async (req, res) => {
     }
 
     // ============================================================
-    // CAPTURAR HTML (solo si se procesaron screenshots de fecha actual)
+    // RESUMEN DE SCREENSHOTS
     // ============================================================
     const currentDate = getArgentinaDateString();
+    const successfulDesktop = allResults.desktop.filter(r => r.success).length;
+    const successfulMobile = allResults.mobile.filter(r => r.success).length;
+    const failedDesktop = allResults.desktop.filter(r => !r.success).length;
+    const failedMobile = allResults.mobile.filter(r => !r.success).length;
     
+    console.log(`\n📊 ===== RESUMEN DE SCREENSHOTS =====`);
+    console.log(`Desktop: ${successfulDesktop} exitosos, ${failedDesktop} fallidos`);
+    console.log(`Mobile: ${successfulMobile} exitosos, ${failedMobile} fallidos`);
+    console.log(`Total: ${successfulDesktop + successfulMobile} exitosos de ${allResults.desktop.length + allResults.mobile.length} intentos`);
+    
+    // Verificar si todos los screenshots fallaron
+    if (successfulDesktop === 0 && successfulMobile === 0 && (allResults.desktop.length > 0 || allResults.mobile.length > 0)) {
+      console.log(`\n❌ CRÍTICO: Todos los screenshots fallaron`);
+      console.log("❌ Posibles causas:");
+      console.log("   - Los Andes está bloqueando la IP del servidor");
+      console.log("   - Problemas de conectividad del servidor");
+      console.log("   - Error en la configuración de Puppeteer");
+      throw new Error("Todos los screenshots fallaron después de múltiples intentos");
+    }
+    
+    // ============================================================
+    // CAPTURAR HTML (solo si se procesaron screenshots de fecha actual)
+    // ============================================================
     console.log(`\n🔍 Verificando captura de HTML...`);
     console.log(`📅 Fecha actual (Argentina): ${currentDate}`);
-    console.log(`📊 Total screenshots desktop: ${allResults.desktop.length}`);
-    console.log(`📊 Total screenshots mobile: ${allResults.mobile.length}`);
     
     // Verificar si se procesaron screenshots exitosos para la fecha actual
     const hasCurrentDateScreenshots = 
