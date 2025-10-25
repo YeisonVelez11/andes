@@ -1,12 +1,14 @@
-require('dotenv').config();
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const cors = require('cors');
-const { google } = require('googleapis');
-const streamifier = require('streamifier');
-const { scrapeLosAndes } = require('./scraper-losandes');
+require("dotenv").config();
+const express = require("express");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const cors = require("cors");
+const { google } = require("googleapis");
+const streamifier = require("streamifier");
+const { scrapeLosAndes } = require("./scraper-losandes");
+const { launchBrowser, configurePage } = require("./puppeteer-config");
+const { getArgentinaDateString } = require("./date-utils");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,28 +18,22 @@ const imagenes = "1bbkECY_axw5IttYjgVpRLmi6-EF80fZz";
 const jsones = "1d40AKgKucYUY-CnSqcLd1v8uyXhElk33";
 const capturas = "1So5xiyo-X--XqPK3lh2zZJz7qYOJIGRR";
 
-// Helper function para obtener fecha en hora argentina (America/Argentina/Buenos_Aires)
-function getLocalDateString(date = new Date()) {
-  // Convertir a hora argentina (UTC-3)
-  const argentinaDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
-  const year = argentinaDate.getFullYear();
-  const month = String(argentinaDate.getMonth() + 1).padStart(2, '0');
-  const day = String(argentinaDate.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-
+/**
+ * Autoriza y conecta con Google Drive API usando credenciales JWT
+ * @returns {Promise<google.auth.JWT>} Cliente JWT autenticado
+ * @throws {Error} Si las credenciales son inválidas o la autorización falla
+ */
 async function authorize() {
-    const jwtClient = new google.auth.JWT(
-        process.env.GOOGLE_CLIENT_EMAIL,
-        null,
-        process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        ['https://www.googleapis.com/auth/drive']
-    );
+  const jwtClient = new google.auth.JWT(
+    process.env.GOOGLE_CLIENT_EMAIL,
+    null,
+    process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+    ["https://www.googleapis.com/auth/drive"]
+  );
 
-    await jwtClient.authorize();
-    console.log('Successfully connected to Google Drive API.');
-    return jwtClient;
+  await jwtClient.authorize();
+  console.log("Successfully connected to Google Drive API.");
+  return jwtClient;
 }
 
 // Initialize Google Drive client
@@ -46,26 +42,34 @@ let driveClient = null;
 // Connect to Google Drive on startup
 if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
   authorize()
-    .then(auth => {
-      driveClient = google.drive({ version: 'v3', auth });
-      console.log('✅ Google Drive API initialized');
+    .then((auth) => {
+      driveClient = google.drive({ version: "v3", auth });
+      console.log("✅ Google Drive API initialized");
     })
-    .catch(err => {
-      console.error('❌ Error connecting to Google Drive:', err.message);
+    .catch((err) => {
     });
 } else {
-  console.warn('⚠️  Google Drive credentials not found.');
+  console.warn("⚠️  Google Drive credentials not found.");
 }
 
-// Helper function to upload file to Google Drive
-async function uploadBufferToDrive(folderId, fileName, buffer, mimeType) {
+/**
+ * Sube un archivo a Google Drive
+ * @param {string} folderId - ID de la carpeta de destino en Google Drive
+ * @param {string} fileName - Nombre del archivo a crear
+ * @param {Buffer} buffer - Buffer con el contenido del archivo
+ * @param {string} mimeType - Tipo MIME del archivo (ej: 'image/png', 'application/json')
+ * @returns {Promise<Object>} Objeto con datos del archivo subido (id, name, webViewLink, webContentLink)
+ * @throws {Error} Si Google Drive no está inicializado o falla la subida
+ */
+async function uploadFileToDrive(folderId, fileName, buffer, mimeType) {
   if (!driveClient) {
-    throw new Error('Google Drive client not initialized');
+    throw new Error("Google Drive client not initialized");
   }
 
   const fileMetadata = {
     name: fileName,
     parents: [folderId],
+    mimeType: mimeType,
   };
 
   const media = {
@@ -77,112 +81,158 @@ async function uploadBufferToDrive(folderId, fileName, buffer, mimeType) {
     const response = await driveClient.files.create({
       resource: fileMetadata,
       media: media,
-      fields: 'id, name, webViewLink, webContentLink',
+      fields: "id, name, webViewLink, webContentLink",
     });
     console.log(`✅ File uploaded to Google Drive: ${fileName} (ID: ${response.data.id})`);
     return response.data;
   } catch (error) {
-    console.error('❌ Error uploading to Google Drive:', error.message);
+    console.error("❌ Error uploading to Google Drive:", error.message);
     throw error;
   }
 }
 
-// Helper function to find JSON file by name in folder
-async function findJsonFileByName(folderId, fileName) {
-  if (!driveClient) return null;
-  
-  try {
-    const response = await driveClient.files.list({
-      q: `name='${fileName}' and '${folderId}' in parents and trashed=false and mimeType='application/json'`,
-      fields: 'files(id, name)',
-      spaces: 'drive'
-    });
-    
-    return response.data.files.length > 0 ? response.data.files[0] : null;
-  } catch (error) {
-    console.error('Error buscando archivo JSON:', error.message);
-    return null;
-  }
-}
-
-// Helper function to get JSON file content
-async function getJsonFileContent(fileId) {
-  if (!driveClient) return null;
-  
-  try {
-    const response = await driveClient.files.get({
-      fileId: fileId,
-      alt: 'media'
-    });
-    
-    return response.data;
-  } catch (error) {
-    console.error('Error obteniendo contenido JSON:', error.message);
-    return null;
-  }
-}
-
-// Helper function to create or update JSON file
-async function createOrUpdateJsonFile(folderId, fileName, content) {
-  if (!driveClient) {
-    throw new Error('Google Drive client not initialized');
-  }
-
-  // Buscar si el archivo ya existe
-  const existingFile = await findJsonFileByName(folderId, fileName);
-  
-  const jsonContent = JSON.stringify(content, null, 2);
-  const buffer = Buffer.from(jsonContent, 'utf-8');
-  
-  const media = {
-    mimeType: 'application/json',
-    body: streamifier.createReadStream(buffer),
-  };
-
-  try {
-    if (existingFile) {
-      // Actualizar archivo existente
-      const response = await driveClient.files.update({
-        fileId: existingFile.id,
-        media: media,
-        fields: 'id, name, webViewLink, webContentLink',
-      });
-      console.log(`✅ JSON file updated: ${fileName}`);
-      return response.data;
-    } else {
-      // Crear nuevo archivo
-      const fileMetadata = {
-        name: fileName,
-        parents: [folderId],
-        mimeType: 'application/json'
-      };
-
-      const response = await driveClient.files.create({
-        resource: fileMetadata,
-        media: media,
-        fields: 'id, name, webViewLink, webContentLink',
-      });
-      console.log(`✅ JSON file created: ${fileName}`);
-      return response.data;
-    }
-  } catch (error) {
-    console.error('❌ Error creating/updating JSON file:', error.message);
-    throw error;
-  }
-}
-
-// Helper function to generate dates between two dates
-function generateDateRange(startDate, endDate) {
+/**
+ * Genera un array de fechas entre dos fechas (inclusive)
+ * @param {string} startDate - Fecha inicial en formato YYYY-MM-DD
+ * @param {string} endDate - Fecha final en formato YYYY-MM-DD
+ * @returns {string[]} Array de fechas en formato YYYY-MM-DD
+ * @example
+ * generateDateArray('2025-10-20', '2025-10-22')
+ * // Returns: ['2025-10-20', '2025-10-21', '2025-10-22']
+ */
+function generateDateArray(startDate, endDate) {
   const dates = [];
   const currentDate = new Date(startDate);
   const end = new Date(endDate);
-  
+
   while (currentDate <= end) {
-    dates.push(new Date(currentDate).toISOString().split('T')[0]);
+    dates.push(new Date(currentDate).toISOString().split("T")[0]);
     currentDate.setDate(currentDate.getDate() + 1);
   }
-  
+
   return dates;
+}
+
+/**
+ * Verifica si una fecha es futura (en hora de Argentina)
+ * @param {string} dateString - Fecha en formato YYYY-MM-DD
+ * @returns {boolean} true si la fecha es futura, false si no
+ */
+function isFutureDate(dateString) {
+  const todayArgentina = getArgentinaDateString();
+  return dateString > todayArgentina;
+}
+
+/**
+ * Busca un archivo JSON por nombre en una carpeta de Google Drive
+ * @param {string} folderId - ID de la carpeta donde buscar
+ * @param {string} fileName - Nombre del archivo JSON a buscar
+ * @returns {Promise<Object|null>} Objeto con datos del archivo (id, name) o null si no existe
+ */
+async function findJsonFileByName(folderId, fileName) {
+  if (!driveClient) {
+    throw new Error("Google Drive client not initialized");
+  }
+
+  try {
+    const response = await driveClient.files.list({
+      q: `name='${fileName}' and '${folderId}' in parents and trashed=false`,
+      fields: "files(id, name)",
+      spaces: "drive",
+    });
+
+    if (response.data.files.length > 0) {
+      return response.data.files[0];
+    }
+    return null;
+  } catch (error) {
+    console.error("Error buscando archivo JSON:", error.message);
+    return null;
+  }
+}
+
+/**
+ * Obtiene el contenido de un archivo JSON desde Google Drive
+ * @param {string} fileId - ID del archivo en Google Drive
+ * @returns {Promise<Object|null>} Contenido parseado del JSON o null si falla
+ */
+async function getJsonFileContent(fileId) {
+  if (!driveClient) {
+    throw new Error("Google Drive client not initialized");
+  }
+
+  try {
+    const response = await driveClient.files.get({
+      fileId: fileId,
+      alt: "media",
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error obteniendo contenido JSON:", error.message);
+    return null;
+  }
+}
+
+/**
+ * Crea o actualiza un archivo JSON en Google Drive
+ * @param {string} folderId - ID de la carpeta de destino
+ * @param {string} fileName - Nombre del archivo JSON
+ * @param {Object|Array} content - Contenido a guardar (será convertido a JSON)
+ * @returns {Promise<Object>} Objeto con datos del archivo creado/actualizado
+ * @throws {Error} Si Google Drive no está inicializado o falla la operación
+ */
+async function createOrUpdateJsonFile(folderId, fileName, content) {
+  if (!driveClient) {
+    throw new Error("Google Drive client not initialized");
+  }
+
+  const jsonContent = JSON.stringify(content, null, 2);
+  const buffer = Buffer.from(jsonContent, "utf-8");
+
+  // Buscar si ya existe
+  const existingFile = await findJsonFileByName(folderId, fileName);
+
+  if (existingFile) {
+    // Actualizar archivo existente
+    const media = {
+      mimeType: "application/json",
+      body: streamifier.createReadStream(buffer),
+    };
+
+    const response = await driveClient.files.update({
+      fileId: existingFile.id,
+      media: media,
+      fields: "id, name, webViewLink, webContentLink",
+    });
+
+    return {
+      ...response.data,
+      action: "updated",
+    };
+  } else {
+    // Crear nuevo archivo
+    const fileMetadata = {
+      name: fileName,
+      parents: [folderId],
+      mimeType: "application/json",
+    };
+
+    const media = {
+      mimeType: "application/json",
+      body: streamifier.createReadStream(buffer),
+    };
+
+    const response = await driveClient.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: "id, name, webViewLink, webContentLink",
+    });
+
+    return {
+      ...response.data,
+      action: "created",
+    };
+  }
 }
 
 // Middleware
@@ -192,16 +242,19 @@ app.use(express.json());
 // Middleware para manejar ngrok y headers
 app.use((req, res, next) => {
   // Permitir acceso desde ngrok
-  res.setHeader('ngrok-skip-browser-warning', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader("ngrok-skip-browser-warning", "true");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   next();
 });
 
-app.use(express.static('public'));
+app.use(express.static("public"));
 // Servir carpeta screenshots para las imágenes de preview en el HTML
-app.use('/screenshots', express.static('screenshots'));
+app.use("/screenshots", express.static("screenshots"));
 
 // ============================================================
 // CONFIGURACIÓN DE MULTER - ALMACENAMIENTO EN MEMORIA
@@ -216,13 +269,19 @@ const storage = multer.memoryStorage(); // Almacenamiento en memoria (NO en disc
 // Filtro para validar tipos de archivo
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const extname = allowedTypes.test(
+    path.extname(file.originalname).toLowerCase()
+  );
   const mimetype = allowedTypes.test(file.mimetype);
 
   if (mimetype && extname) {
     return cb(null, true);
   } else {
-    cb(new Error('Solo se permiten archivos de imagen (JPEG, JPG, PNG, GIF, WebP)'));
+    cb(
+      new Error(
+        "Solo se permiten archivos de imagen (JPEG, JPG, PNG, GIF, WebP)"
+      )
+    );
   }
 };
 
@@ -230,9 +289,9 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage, // memoryStorage: NO guarda archivos localmente
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB máximo por archivo
+    fileSize: 5 * 1024 * 1024, // 5MB máximo por archivo
   },
-  fileFilter: fileFilter
+  fileFilter: fileFilter,
 });
 
 // NOTA: Si existe una carpeta 'uploads/' con archivos, son de ejecuciones
@@ -241,40 +300,43 @@ const upload = multer({
 
 // Definir los campos de archivo esperados
 const uploadFields = upload.fields([
-  { name: 'imagenLateral', maxCount: 1 },
-  { name: 'imagenAncho', maxCount: 1 },
-  { name: 'imagenTop', maxCount: 1 },
-  { name: 'itt', maxCount: 1 },
-  { name: 'zocalo', maxCount: 1 }
+  { name: "imagenLateral", maxCount: 1 },
+  { name: "imagenAncho", maxCount: 1 },
+  { name: "imagenTop", maxCount: 1 },
+  { name: "itt", maxCount: 1 },
+  { name: "zocalo", maxCount: 1 },
 ]);
 
 // Health check endpoint (para Docker y monitoreo)
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
+app.get("/health", (req, res) => {
+  const argentinaDate = getArgentinaDateString();
+  console.log(`📅 Fecha actual (Argentina): ${argentinaDate}`);
+  res.status(200).json({
+    status: "ok",
     timestamp: new Date().toISOString(),
+    argentinaDate: argentinaDate,
     uptime: process.uptime(),
-    drive: driveClient ? 'connected' : 'disconnected'
+    drive: driveClient ? "connected" : "disconnected",
   });
 });
 
 // Ruta principal
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // Endpoint para subir imágenes
-app.post('/upload', async (req, res) => {
+app.post("/upload", async (req, res) => {
   uploadFields(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       return res.status(400).json({
         success: false,
-        error: 'Error al subir archivo: ' + err.message
+        error: "Error al subir archivo: " + err.message,
       });
     } else if (err) {
       return res.status(400).json({
         success: false,
-        error: err.message
+        error: err.message,
       });
     }
 
@@ -282,7 +344,7 @@ app.post('/upload', async (req, res) => {
     if (!req.files || Object.keys(req.files).length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'No se subieron archivos'
+        error: "No se subieron archivos",
       });
     }
 
@@ -290,7 +352,7 @@ app.post('/upload', async (req, res) => {
     if (!driveClient) {
       return res.status(500).json({
         success: false,
-        error: 'Google Drive no está configurado'
+        error: "Google Drive no está configurado",
       });
     }
 
@@ -304,23 +366,29 @@ app.post('/upload', async (req, res) => {
         uploadedFiles[fieldName] = {
           originalname: file.originalname,
           size: file.size,
-          mimetype: file.mimetype
+          mimetype: file.mimetype,
         };
 
         // Subir el archivo a Google Drive
-        const drivePromise = uploadBufferToDrive(
+        const drivePromise = uploadFileToDrive(
           imagenes,
           file.originalname,
           file.buffer,
           file.mimetype
-        ).then(driveFile => {
-          uploadedFiles[fieldName].driveId = driveFile.id;
-          uploadedFiles[fieldName].driveLink = driveFile.webViewLink;
-          uploadedFiles[fieldName].driveContentLink = driveFile.webContentLink;
-        }).catch(err => {
-          console.error(`Error al subir ${file.originalname} a Drive:`, err.message);
-          uploadedFiles[fieldName].driveError = err.message;
-        });
+        )
+          .then((driveFile) => {
+            uploadedFiles[fieldName].driveId = driveFile.id;
+            uploadedFiles[fieldName].driveLink = driveFile.webViewLink;
+            uploadedFiles[fieldName].driveContentLink =
+              driveFile.webContentLink;
+          })
+          .catch((err) => {
+            console.error(
+              `Error al subir ${file.originalname} a Drive:`,
+              err.message
+            );
+            uploadedFiles[fieldName].driveError = err.message;
+          });
         driveUploadPromises.push(drivePromise);
       }
     }
@@ -329,8 +397,8 @@ app.post('/upload', async (req, res) => {
     await Promise.all(driveUploadPromises);
 
     // Obtener el tipo de dispositivo del body
-    const deviceType = req.body.deviceType || 'desktop';
-    
+    const deviceType = req.body.deviceType || "desktop";
+
     // Obtener el tipo de visualización (solo para desktop)
     const visualizationType = req.body.visualizationType || null;
 
@@ -339,77 +407,99 @@ app.post('/upload', async (req, res) => {
     const selectedFolderName = req.body.selectedFolderName || null;
 
     // Obtener rangos de fechas del body
-    const dateRange1 = req.body.dateRange1 ? JSON.parse(req.body.dateRange1) : null;
-    const dateRange2 = req.body.dateRange2 ? JSON.parse(req.body.dateRange2) : null;
-    const firstLastOnly = req.body.firstLastOnly === 'true';
+    const dateRange1 = req.body.dateRange1
+      ? JSON.parse(req.body.dateRange1)
+      : null;
+    const dateRange2 = req.body.dateRange2
+      ? JSON.parse(req.body.dateRange2)
+      : null;
+    const firstLastOnly = req.body.firstLastOnly === "true";
 
     // Procesar rangos de fechas y crear/actualizar archivos JSON
     const jsonResults = [];
-    
+
     if (dateRange1 && dateRange1.start && dateRange1.end) {
       let dates1;
-      
+
       if (firstLastOnly) {
         // Solo el primer y último día del rango
         dates1 = [dateRange1.start, dateRange1.end];
       } else {
         // Todos los días en el rango
-        dates1 = generateDateRange(dateRange1.start, dateRange1.end);
+        dates1 = generateDateArray(dateRange1.start, dateRange1.end);
       }
       for (const date of dates1) {
         try {
           const jsonFileName = `${date}.json`;
           const existingFile = await findJsonFileByName(jsones, jsonFileName);
-          
+
           let jsonData = [];
-          
+
           // Si el archivo existe, obtener su contenido
           if (existingFile) {
             const existingContent = await getJsonFileContent(existingFile.id);
             jsonData = Array.isArray(existingContent) ? existingContent : [];
           }
-          
+
           // Crear objeto con la información de las imágenes
           const imageData = {
-            imagenLateral: uploadedFiles.imagenLateral ? `/image/${uploadedFiles.imagenLateral.driveId}` : null,
-            imagenAncho: uploadedFiles.imagenAncho ? `/image/${uploadedFiles.imagenAncho.driveId}` : null,
-            imagenTop: uploadedFiles.imagenTop ? `/image/${uploadedFiles.imagenTop.driveId}` : null,
-            itt: uploadedFiles.itt ? `/image/${uploadedFiles.itt.driveId}` : null,
-            zocalo: uploadedFiles.zocalo ? `/image/${uploadedFiles.zocalo.driveId}` : null,
+            imagenLateral: uploadedFiles.imagenLateral
+              ? `/image/${uploadedFiles.imagenLateral.driveId}`
+              : null,
+            imagenAncho: uploadedFiles.imagenAncho
+              ? `/image/${uploadedFiles.imagenAncho.driveId}`
+              : null,
+            imagenTop: uploadedFiles.imagenTop
+              ? `/image/${uploadedFiles.imagenTop.driveId}`
+              : null,
+            itt: uploadedFiles.itt
+              ? `/image/${uploadedFiles.itt.driveId}`
+              : null,
+            zocalo: uploadedFiles.zocalo
+              ? `/image/${uploadedFiles.zocalo.driveId}`
+              : null,
             deviceType: deviceType,
-            uploadedAt: new Date(date + 'T00:00:00').toISOString() // Usar fecha de la campaña
+            uploadedAt: new Date(date + "T00:00:00").toISOString(), // Usar fecha de la campaña
           };
-          
+
           // Agregar tipo_visualización si está definido (desktop: A,B,C,D / mobile: A,B,C)
           if (visualizationType) {
             imageData.tipo_visualizacion = visualizationType;
           }
-          
+
           // Agregar información de la carpeta seleccionada
           if (selectedFolderId && selectedFolderName) {
             imageData.carpeta_id = selectedFolderId;
             imageData.carpeta_nombre = selectedFolderName;
           }
-          
+
           // Generar campo campaña: nombreCarpeta-deviceType-variacion
-          let campana = '';
+          let campana = "";
           if (selectedFolderName) {
             campana = selectedFolderName;
           } else {
-            campana = 'sin-carpeta';
+            campana = "sin-carpeta";
           }
           campana += `-${deviceType}`;
           if (visualizationType) {
             campana += `-${visualizationType}`;
           }
           imageData.campana = campana;
-          
+
           // Agregar al array
           jsonData.push(imageData);
-          
+
           // Crear o actualizar el archivo JSON
-          const result = await createOrUpdateJsonFile(jsones, jsonFileName, jsonData);
-          jsonResults.push({ date, fileId: result.id, action: existingFile ? 'updated' : 'created' });
+          const result = await createOrUpdateJsonFile(
+            jsones,
+            jsonFileName,
+            jsonData
+          );
+          jsonResults.push({
+            date,
+            fileId: result.id,
+            action: existingFile ? "updated" : "created",
+          });
         } catch (error) {
           console.error(`Error procesando fecha ${date}:`, error.message);
           jsonResults.push({ date, error: error.message });
@@ -418,61 +508,79 @@ app.post('/upload', async (req, res) => {
     }
 
     if (dateRange2 && dateRange2.start && dateRange2.end) {
-      const dates2 = generateDateRange(dateRange2.start, dateRange2.end);
+      const dates2 = generateDateArray(dateRange2.start, dateRange2.end);
       for (const date of dates2) {
         try {
           const jsonFileName = `${date}.json`;
           const existingFile = await findJsonFileByName(jsones, jsonFileName);
-          
+
           let jsonData = [];
-          
+
           // Si el archivo existe, obtener su contenido
           if (existingFile) {
             const existingContent = await getJsonFileContent(existingFile.id);
             jsonData = Array.isArray(existingContent) ? existingContent : [];
           }
-          
+
           // Crear objeto con la información de las imágenes
           const imageData = {
-            imagenLateral: uploadedFiles.imagenLateral ? `/image/${uploadedFiles.imagenLateral.driveId}` : null,
-            imagenAncho: uploadedFiles.imagenAncho ? `/image/${uploadedFiles.imagenAncho.driveId}` : null,
-            imagenTop: uploadedFiles.imagenTop ? `/image/${uploadedFiles.imagenTop.driveId}` : null,
-            itt: uploadedFiles.itt ? `/image/${uploadedFiles.itt.driveId}` : null,
-            zocalo: uploadedFiles.zocalo ? `/image/${uploadedFiles.zocalo.driveId}` : null,
+            imagenLateral: uploadedFiles.imagenLateral
+              ? `/image/${uploadedFiles.imagenLateral.driveId}`
+              : null,
+            imagenAncho: uploadedFiles.imagenAncho
+              ? `/image/${uploadedFiles.imagenAncho.driveId}`
+              : null,
+            imagenTop: uploadedFiles.imagenTop
+              ? `/image/${uploadedFiles.imagenTop.driveId}`
+              : null,
+            itt: uploadedFiles.itt
+              ? `/image/${uploadedFiles.itt.driveId}`
+              : null,
+            zocalo: uploadedFiles.zocalo
+              ? `/image/${uploadedFiles.zocalo.driveId}`
+              : null,
             deviceType: deviceType,
-            uploadedAt: new Date(date + 'T00:00:00').toISOString() // Usar fecha de la campaña
+            uploadedAt: new Date(date + "T00:00:00").toISOString(), // Usar fecha de la campaña
           };
-          
+
           // Agregar tipo_visualización si está definido (desktop: A,B,C,D / mobile: A,B,C)
           if (visualizationType) {
             imageData.tipo_visualizacion = visualizationType;
           }
-          
+
           // Agregar información de la carpeta seleccionada
           if (selectedFolderId && selectedFolderName) {
             imageData.carpeta_id = selectedFolderId;
             imageData.carpeta_nombre = selectedFolderName;
           }
-          
+
           // Generar campo campaña: nombreCarpeta-deviceType-variacion
-          let campana = '';
+          let campana = "";
           if (selectedFolderName) {
             campana = selectedFolderName;
           } else {
-            campana = 'sin-carpeta';
+            campana = "sin-carpeta";
           }
           campana += `-${deviceType}`;
           if (visualizationType) {
             campana += `-${visualizationType}`;
           }
           imageData.campana = campana;
-          
+
           // Agregar al array
           jsonData.push(imageData);
-          
+
           // Crear o actualizar el archivo JSON
-          const result = await createOrUpdateJsonFile(jsones, jsonFileName, jsonData);
-          jsonResults.push({ date, fileId: result.id, action: existingFile ? 'updated' : 'created' });
+          const result = await createOrUpdateJsonFile(
+            jsones,
+            jsonFileName,
+            jsonData
+          );
+          jsonResults.push({
+            date,
+            fileId: result.id,
+            action: existingFile ? "updated" : "created",
+          });
         } catch (error) {
           console.error(`Error procesando fecha ${date}:`, error.message);
           jsonResults.push({ date, error: error.message });
@@ -483,150 +591,158 @@ app.post('/upload', async (req, res) => {
     // Responder con éxito
     res.json({
       success: true,
-      message: 'Imágenes subidas a Google Drive correctamente',
+      message: "Imágenes subidas a Google Drive correctamente",
       deviceType: deviceType,
       files: uploadedFiles,
       jsonFiles: jsonResults,
-      uploadedAt: new Date().toISOString()
+      uploadedAt: new Date().toISOString(),
     });
   });
 });
 
 // Endpoint para listar archivos de Google Drive
-app.get('/uploads', async (req, res) => {
+app.get("/uploads", async (req, res) => {
   if (!driveClient) {
     return res.status(500).json({
       success: false,
-      error: 'Google Drive no está configurado'
+      error: "Google Drive no está configurado",
     });
   }
 
   try {
     const response = await driveClient.files.list({
       q: `'${imagenes}' in parents and trashed=false and mimeType contains 'image/'`,
-      fields: 'files(id, name, size, createdTime, webViewLink, webContentLink, thumbnailLink, mimeType)',
-      orderBy: 'createdTime desc',
-      pageSize: 100
+      fields:
+        "files(id, name, size, createdTime, webViewLink, webContentLink, thumbnailLink, mimeType)",
+      orderBy: "createdTime desc",
+      pageSize: 100,
     });
 
     res.json({
       success: true,
-      files: response.data.files
+      files: response.data.files,
     });
   } catch (error) {
-    console.error('Error al listar archivos de Drive:', error.message);
+    console.error("Error al listar archivos de Drive:", error.message);
     res.status(500).json({
       success: false,
-      error: 'Error al obtener archivos de Google Drive'
+      error: "Error al obtener archivos de Google Drive",
     });
   }
 });
 
 // Endpoint para listar carpetas de Google Drive
-app.get('/folders', async (req, res) => {
+app.get("/folders", async (req, res) => {
   if (!driveClient) {
     return res.status(500).json({
       success: false,
-      error: 'Google Drive no está configurado'
+      error: "Google Drive no está configurado",
     });
   }
 
   try {
-    const parentId = req.query.parentId || '1norxhMEG62maIArwy-zjolxzPGsQoBzq'; // Carpeta raíz por defecto
-    
+    const parentId = req.query.parentId || "1norxhMEG62maIArwy-zjolxzPGsQoBzq"; // Carpeta raíz por defecto
+
     const response = await driveClient.files.list({
       q: `'${parentId}' in parents and trashed=false and mimeType='application/vnd.google-apps.folder'`,
-      fields: 'files(id, name, mimeType, modifiedTime)',
-      orderBy: 'name asc',
-      pageSize: 100
+      fields: "files(id, name, mimeType, modifiedTime)",
+      orderBy: "name asc",
+      pageSize: 100,
     });
 
     // Filtrar carpetas excluidas (imagenes, jsones, screenshots)
-    const excludedFolders = ['imagenes', 'jsones', 'screenshots', 'webs_pasado','config'];
-    const filteredFolders = response.data.files.filter(folder => 
-      !excludedFolders.includes(folder.name.toLowerCase())
+    const excludedFolders = [
+      "imagenes",
+      "jsones",
+      "screenshots",
+      "webs_pasado",
+      "config",
+    ];
+    const filteredFolders = response.data.files.filter(
+      (folder) => !excludedFolders.includes(folder.name.toLowerCase())
     );
 
     res.json({
       success: true,
       folders: filteredFolders,
-      parentId: parentId
+      parentId: parentId,
     });
   } catch (error) {
-    console.error('Error al listar carpetas de Drive:', error.message);
+    console.error("Error al listar carpetas de Drive:", error.message);
     res.status(500).json({
       success: false,
-      error: 'Error al obtener carpetas de Google Drive'
+      error: "Error al obtener carpetas de Google Drive",
     });
   }
 });
 
 // Endpoint para obtener información de una carpeta específica
-app.get('/folder-info/:folderId', async (req, res) => {
+app.get("/folder-info/:folderId", async (req, res) => {
   if (!driveClient) {
     return res.status(500).json({
       success: false,
-      error: 'Google Drive no está configurado'
+      error: "Google Drive no está configurado",
     });
   }
 
   try {
     const folderId = req.params.folderId;
-    
+
     const response = await driveClient.files.get({
       fileId: folderId,
-      fields: 'id, name, parents'
+      fields: "id, name, parents",
     });
 
     res.json({
       success: true,
-      folder: response.data
+      folder: response.data,
     });
   } catch (error) {
-    console.error('Error al obtener información de carpeta:', error.message);
+    console.error("Error al obtener información de carpeta:", error.message);
     res.status(500).json({
       success: false,
-      error: 'Error al obtener información de carpeta'
+      error: "Error al obtener información de carpeta",
     });
   }
 });
 
 // Endpoint para listar archivos JSON
-app.get('/json-files', async (req, res) => {
+app.get("/json-files", async (req, res) => {
   if (!driveClient) {
     return res.status(500).json({
       success: false,
-      error: 'Google Drive no está configurado'
+      error: "Google Drive no está configurado",
     });
   }
 
   try {
     const response = await driveClient.files.list({
       q: `'${jsones}' in parents and trashed=false and mimeType='application/json'`,
-      fields: 'files(id, name, size, createdTime, modifiedTime, webViewLink, webContentLink)',
-      orderBy: 'name asc',
-      pageSize: 100
+      fields:
+        "files(id, name, size, createdTime, modifiedTime, webViewLink, webContentLink)",
+      orderBy: "name asc",
+      pageSize: 100,
     });
 
     res.json({
       success: true,
-      files: response.data.files
+      files: response.data.files,
     });
   } catch (error) {
-    console.error('Error al listar archivos JSON:', error.message);
+    console.error("Error al listar archivos JSON:", error.message);
     res.status(500).json({
       success: false,
-      error: 'Error al obtener archivos JSON de Google Drive'
+      error: "Error al obtener archivos JSON de Google Drive",
     });
   }
 });
 
 // Endpoint para obtener contenido de un archivo JSON específico
-app.get('/json-file/:fileId', async (req, res) => {
+app.get("/json-file/:fileId", async (req, res) => {
   if (!driveClient) {
     return res.status(500).json({
       success: false,
-      error: 'Google Drive no está configurado'
+      error: "Google Drive no está configurado",
     });
   }
 
@@ -636,23 +752,23 @@ app.get('/json-file/:fileId', async (req, res) => {
     const content = await getJsonFileContent(fileId);
     res.json({
       success: true,
-      content: content
+      content: content,
     });
   } catch (error) {
-    console.error('Error al obtener archivo JSON:', error.message);
+    console.error("Error al obtener archivo JSON:", error.message);
     res.status(404).json({
       success: false,
-      error: 'Archivo JSON no encontrado'
+      error: "Archivo JSON no encontrado",
     });
   }
 });
 
 // Endpoint para servir imágenes de Google Drive (proxy)
-app.get('/image/:fileId', async (req, res) => {
+app.get("/image/:fileId", async (req, res) => {
   if (!driveClient) {
     return res.status(500).json({
       success: false,
-      error: 'Google Drive no está configurado'
+      error: "Google Drive no está configurado",
     });
   }
 
@@ -660,437 +776,491 @@ app.get('/image/:fileId', async (req, res) => {
 
   try {
     const response = await driveClient.files.get(
-      { fileId: fileId, alt: 'media' },
-      { responseType: 'stream' }
+      { fileId: fileId, alt: "media" },
+      { responseType: "stream" }
     );
 
     // Establecer headers apropiados para ngrok y CORS
-    res.setHeader('Content-Type', response.headers['content-type'] || 'image/png');
-    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache por 24 horas
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('ngrok-skip-browser-warning', 'true');
+    res.setHeader(
+      "Content-Type",
+      response.headers["content-type"] || "image/png"
+    );
+    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache por 24 horas
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("ngrok-skip-browser-warning", "true");
 
     // Pipe el stream de Drive a la respuesta
     response.data.pipe(res);
   } catch (error) {
-    console.error(`Error al obtener imagen de Drive (${fileId}):`, error.message);
+    console.error(
+      `Error al obtener imagen de Drive (${fileId}):`,
+      error.message
+    );
     // Enviar una imagen transparente 1x1 en caso de error
-    const transparentPixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
-    res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    const transparentPixel = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64"
+    );
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.send(transparentPixel);
   }
 });
 
-// Función para capturar y guardar HTML de Los Andes
+/**
+ * Captura el HTML de Los Andes (desktop y mobile) y lo guarda en Google Drive
+ * Usa la fecha actual de Argentina para nombrar los archivos
+ * Si el archivo ya existe, lo actualiza; si no, lo crea
+ * @returns {Promise<void>}
+ * @throws {Error} Si falla el lanzamiento del navegador o la captura del HTML
+ */
 async function captureAndSaveHTML() {
-  const puppeteer = require('puppeteer');
-  const htmlFolderId = '1SWuk-zjLFg40weIaJ_oF3PbPgPDDTy49';
-  const url = 'https://www.losandes.com.ar/';
-  const today = getLocalDateString(); // YYYY-MM-DD
+  const htmlFolderId = "1SWuk-zjLFg40weIaJ_oF3PbPgPDDTy49";
+  const url = "https://www.losandes.com.ar/";
+  const today = getArgentinaDateString(); // YYYY-MM-DD
   
+  // Validar que no sea fecha futura
+  if (isFutureDate(today)) {
+    console.log(`⚠️ Fecha futura detectada (${today}), saltando captura de HTML`);
+    return;
+  }
+
   // Configuraciones para desktop y mobile
-  const configs = [
-    {
-      name: 'desktop',
-      fileName: `${today}_desktop.html`,
-      viewport: { width: 1920, height: 1080 },
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    },
-    {
-      name: 'mobile',
-      fileName: `${today}_mobile.html`,
-      viewport: { width: 400, height: 824 },
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
-      isMobile: true
-    }
-  ];
-  
-  for (const config of configs) {
-    console.log(`\n📱 ===== Capturando HTML ${config.name.toUpperCase()} =====`);
-    console.log(`📄 Archivo: ${config.fileName}`);
-    console.log(`📐 Viewport: ${config.viewport.width}x${config.viewport.height}`);
+  const deviceTypes = ["desktop", "mobile"];
+
+  for (const deviceType of deviceTypes) {
+    const fileName = `${today}_${deviceType}.html`;
     
+    console.log(
+      `\n📱 ===== Capturando HTML ${deviceType.toUpperCase()} =====`
+    );
+    console.log(`📄 Archivo: ${fileName}`);
+
     let browser;
     try {
-      console.log('🔧 Lanzando navegador Puppeteer...');
-     browser = await puppeteer.launch({
-        args: [
-          "--disable-setuid-sandbox",
-          "--no-sandbox",
-          "--single-process",
-          "--no-zygote",
-        ],
-        headless: "true",
-        executablePath:
-          process.env.NODE_ENV === "production"
-            ? process.env.PUPPETEER_EXECUTABLE_PATH
-            : puppeteer.executablePath(),
-      });
-      console.log('✅ Navegador lanzado exitosamente');
-      
-      console.log('📄 Creando nueva página...');
+      console.log("🔧 Lanzando navegador Puppeteer...");
+      browser = await launchBrowser(deviceType);
+      console.log("✅ Navegador lanzado exitosamente");
+
+      console.log("📄 Creando nueva página...");
       const page = await browser.newPage();
-      console.log('✅ Página creada');
-      
-      // Configurar viewport con opciones mobile si aplica
-      console.log('🔧 Configurando viewport...');
-      if (config.isMobile) {
-        await page.setViewport({
-          width: config.viewport.width,
-          height: config.viewport.height,
-          deviceScaleFactor: 2,
-          isMobile: true,
-          hasTouch: true,
-          isLandscape: false
-        });
-        console.log('✅ Viewport mobile configurado');
-      } else {
-        await page.setViewport(config.viewport);
-        console.log('✅ Viewport desktop configurado');
-      }
-      
-      // Configurar user agent
-      console.log('🔧 Configurando User Agent...');
-      await page.setUserAgent(config.userAgent);
-      console.log('✅ User Agent configurado');
-      
+      console.log("✅ Página creada");
+
+      // Configurar página con user agent y headers
+      console.log("🔧 Configurando página...");
+      await configurePage(page, deviceType);
+      console.log("✅ Página configurada");
+
       // Navegar a la página
       console.log(`🌐 Navegando a ${url}...`);
       await page.goto(url, {
-        waitUntil: 'networkidle2',
-        timeout: 60000
+        waitUntil: "networkidle2",
+        timeout: 60000,
       });
-      console.log('✅ Página cargada exitosamente');
-      
+      console.log("✅ Página cargada exitosamente");
+
       // Obtener el HTML completo
-      console.log('📝 Obteniendo contenido HTML...');
+      console.log("📝 Obteniendo contenido HTML...");
       const html = await page.content();
       console.log(`✅ HTML obtenido (${html.length} caracteres)`);
-      
+
       // Convertir HTML a buffer
-      const htmlBuffer = Buffer.from(html, 'utf-8');
+      const htmlBuffer = Buffer.from(html, "utf-8");
       console.log(`💾 Buffer creado (${htmlBuffer.length} bytes)`);
-      
+
       // Subir a Google Drive
       const fileMetadata = {
-        name: config.fileName,
+        name: fileName,
         parents: [htmlFolderId],
-        mimeType: 'text/html'
+        mimeType: "text/html",
       };
-      
+
       const media = {
-        mimeType: 'text/html',
-        body: require('stream').Readable.from(htmlBuffer)
+        mimeType: "text/html",
+        body: require("stream").Readable.from(htmlBuffer),
       };
-      
+
       // Buscar si ya existe un archivo con ese nombre
-      console.log(`🔍 Buscando archivo existente: ${config.fileName}...`);
+      console.log(`🔍 Buscando archivo existente: ${fileName}...`);
       const existingFiles = await driveClient.files.list({
-        q: `name='${config.fileName}' and '${htmlFolderId}' in parents and trashed=false`,
-        fields: 'files(id, name)',
-        spaces: 'drive'
+        q: `name='${fileName}' and '${htmlFolderId}' in parents and trashed=false`,
+        fields: "files(id, name)",
+        spaces: "drive",
       });
-      
+
       if (existingFiles.data.files.length > 0) {
         // Actualizar archivo existente
         const fileId = existingFiles.data.files[0].id;
-        console.log(`📝 Archivo existente encontrado (ID: ${fileId}), actualizando...`);
+        console.log(
+          `📝 Archivo existente encontrado (ID: ${fileId}), actualizando...`
+        );
         await driveClient.files.update({
           fileId: fileId,
-          media: media
+          media: media,
         });
-        console.log(`✅ HTML ${config.name} actualizado: ${config.fileName}`);
+        console.log(`✅ HTML ${deviceType} actualizado: ${fileName}`);
       } else {
         // Crear nuevo archivo
-        console.log('📝 Archivo no existe, creando nuevo...');
+        console.log("📝 Archivo no existe, creando nuevo...");
         await driveClient.files.create({
           requestBody: fileMetadata,
           media: media,
-          fields: 'id, name, webViewLink'
+          fields: "id, name, webViewLink",
         });
-        console.log(`✅ HTML ${config.name} creado: ${config.fileName}`);
+        console.log(`✅ HTML ${deviceType} creado: ${fileName}`);
       }
-      
     } catch (error) {
-      console.error(`❌ Error capturando HTML ${config.name}:`, error.message);
-      console.error('Stack:', error.stack);
+      console.error(`❌ Error capturando HTML ${deviceType}:`, error.message);
+      console.error("Stack:", error.stack);
       throw error;
     } finally {
       if (browser) {
-        console.log('🔒 Cerrando navegador...');
+        console.log("🔒 Cerrando navegador...");
         await browser.close();
-        console.log('✅ Navegador cerrado');
+        console.log("✅ Navegador cerrado");
       }
     }
   }
 }
 
 // Endpoint GET que llama al POST de generate-screenshot (simplificado)
-app.get('/generate-screenshot', async (req, res) => {
+app.get("/generate-screenshot", async (req, res) => {
   try {
-    console.log('🚀 GET /generate-screenshot - Llamando a POST internamente...');
-    
+    console.log(
+      "🚀 GET /generate-screenshot - Llamando a POST internamente..."
+    );
+
     // Usar fecha actual por defecto
-    const currentDate = getLocalDateString();
-    
+    const currentDate = getArgentinaDateString();
+
     // Construir URL del servidor
     const protocol = req.protocol;
-    const host = req.get('host');
+    const host = req.get("host");
     const baseUrl = `${protocol}://${host}`;
-    
+
     // Llamar al endpoint POST internamente
-    const axios = require('axios');
-    const response = await axios.post(`${baseUrl}/generate-screenshot`, {
-      targetDates: [currentDate]
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
+    const axios = require("axios");
+    const response = await axios.post(
+      `${baseUrl}/generate-screenshot`,
+      {
+        targetDates: [currentDate],
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
-    });
-    
+    );
+
     // Retornar la respuesta del POST
     res.json(response.data);
-    
   } catch (error) {
-    console.error('❌ Error en GET /generate-screenshot:', error.message);
+    console.error("❌ Error en GET /generate-screenshot:", error.message);
     res.status(500).json({
       success: false,
-      error: 'Error al generar screenshots',
-      details: error.message
+      error: "Error al generar screenshots",
+      details: error.message,
     });
   }
 });
 
 // Endpoint para generar screenshot de Los Andes
-app.post('/generate-screenshot', async (req, res) => {
+app.post("/generate-screenshot", async (req, res) => {
   try {
-    console.log('🚀 Generando screenshots de Los Andes...');
-    
+    console.log("🚀 Generando screenshots de Los Andes...");
+
     const targetDates = req.body.targetDates || []; // Array de fechas a procesar
-    
+
     // Si no se especificaron fechas, usar el día actual
-    const datesToProcess = targetDates.length > 0 
-      ? targetDates 
-      : [getLocalDateString()];
-    
-    console.log(`📅 Fechas a procesar: ${datesToProcess.join(', ')}`);
+    const datesToProcess =
+      targetDates.length > 0 ? targetDates : [getArgentinaDateString()];
+
+    console.log(`📅 Fechas a procesar: ${datesToProcess.join(", ")}`);
     console.log(`📱 Generando screenshots para DESKTOP y MOBILE`);
-    
+
     const allResults = {
       desktop: [],
-      mobile: []
+      mobile: [],
     };
-    
+
     // ============================================================
     // PROCESAR DESKTOP
     // ============================================================
-    console.log('\n🖥️ ===== PROCESANDO DESKTOP =====');
-    
+    console.log("\n🖥️ ===== PROCESANDO DESKTOP =====");
+
     for (const dateToProcess of datesToProcess) {
       console.log(`\n📆 Procesando fecha DESKTOP: ${dateToProcess}`);
-      
+
       // Validar que la fecha no sea futura
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const processDate = new Date(dateToProcess + 'T00:00:00');
-      processDate.setHours(0, 0, 0, 0);
-      
-      if (processDate > today) {
-        console.log(`⏭️ Saltando fecha futura DESKTOP: ${dateToProcess} (no se pueden generar screenshots para fechas futuras)`);
+      if (isFutureDate(dateToProcess)) {
+        console.log(
+          `⏭️ Saltando fecha futura DESKTOP: ${dateToProcess} (no se pueden generar screenshots para fechas futuras)`
+        );
         continue;
       }
-      
+
       const jsonFileName = `${dateToProcess}.json`;
       const existingFile = await findJsonFileByName(jsones, jsonFileName);
-      
+
       if (!existingFile) {
-        console.log(`⚠️ No se encontró JSON para ${dateToProcess}, saltando...`);
+        console.log(
+          `⚠️ No se encontró JSON para ${dateToProcess}, saltando...`
+        );
         continue;
       }
-      
+
       const jsonContent = await getJsonFileContent(existingFile.id);
       const jsonData = Array.isArray(jsonContent) ? jsonContent : [];
-      const desktopRecords = jsonData.filter(record => record.deviceType === 'desktop');
-      
+      const desktopRecords = jsonData.filter(
+        (record) => record.deviceType === "desktop"
+      );
+
       if (desktopRecords.length === 0) {
-        console.log(`⚠️ No se encontraron registros desktop para ${dateToProcess}, saltando...`);
+        console.log(
+          `⚠️ No se encontraron registros desktop para ${dateToProcess}, saltando...`
+        );
         continue;
       }
-      
-      console.log(`📊 Se encontraron ${desktopRecords.length} registros desktop para ${dateToProcess}`);
-      
+
+      console.log(
+        `📊 Se encontraron ${desktopRecords.length} registros desktop para ${dateToProcess}`
+      );
+
       for (let i = 0; i < desktopRecords.length; i++) {
         const record = desktopRecords[i];
-        const visualizationType = record.tipo_visualizacion || 'A';
+        const visualizationType = record.tipo_visualizacion || "A";
         const targetFolderId = record.carpeta_id || capturas;
-        const targetFolderName = record.carpeta_nombre || 'capturas (default)';
-        
-        console.log(`\n🎬 Generando screenshot DESKTOP ${i + 1}/${desktopRecords.length} - Tipo: ${visualizationType}`);
-        console.log(`📁 Carpeta destino: ${targetFolderName} (ID: ${targetFolderId})`);
-        
+        const targetFolderName = record.carpeta_nombre || "capturas (default)";
+
+        console.log(
+          `\n🎬 Generando screenshot DESKTOP ${i + 1}/${
+            desktopRecords.length
+          } - Tipo: ${visualizationType}`
+        );
+        console.log(
+          `📁 Carpeta destino: ${targetFolderName} (ID: ${targetFolderId})`
+        );
+
         try {
-          const forwardedHost = req.get('x-forwarded-host');
-          const forwardedProto = req.get('x-forwarded-proto');
-          const host = forwardedHost || req.get('host');
+          const forwardedHost = req.get("x-forwarded-host");
+          const forwardedProto = req.get("x-forwarded-proto");
+          const host = forwardedHost || req.get("host");
           const protocol = forwardedProto || req.protocol;
           const baseUrl = `${protocol}://${host}`;
-          
+
           const jsonDataForScraper = {
-            imagenLateral: record.imagenLateral ? `${baseUrl}${record.imagenLateral}` : null,
-            imagenAncho: record.imagenAncho ? `${baseUrl}${record.imagenAncho}` : null,
-            imagenTop: record.imagenTop ? `${baseUrl}${record.imagenTop}` : null,
+            imagenLateral: record.imagenLateral
+              ? `${baseUrl}${record.imagenLateral}`
+              : null,
+            imagenAncho: record.imagenAncho
+              ? `${baseUrl}${record.imagenAncho}`
+              : null,
+            imagenTop: record.imagenTop
+              ? `${baseUrl}${record.imagenTop}`
+              : null,
             itt: record.itt ? `${baseUrl}${record.itt}` : null,
-            zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null
+            zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null,
           };
+
+          const currentDate = getArgentinaDateString();
+          const targetDate = dateToProcess < currentDate ? dateToProcess : null;
           
-          const currentDate = getLocalDateString();
-          const targetDate = (dateToProcess < currentDate) ? dateToProcess : null;
-          
-          const result = await scrapeLosAndes('desktop', targetFolderId, visualizationType, jsonDataForScraper, targetDate);
+          console.log(`🔍 DESKTOP - dateToProcess: ${dateToProcess}, currentDate: ${currentDate}, targetDate: ${targetDate}`);
+
+          const result = await scrapeLosAndes(
+            "desktop",
+            targetFolderId,
+            visualizationType,
+            jsonDataForScraper,
+            targetDate
+          );
           allResults.desktop.push({
             ...result,
             visualizationType,
             recordIndex: i,
             date: dateToProcess,
-            deviceType: 'desktop'
+            deviceType: "desktop",
           });
         } catch (error) {
-          console.error(`❌ Error en screenshot DESKTOP ${i + 1}:`, error.message);
+          console.error(
+            `❌ Error en screenshot DESKTOP ${i + 1}:`,
+            error.message
+          );
           allResults.desktop.push({
             success: false,
             error: error.message,
             visualizationType,
             recordIndex: i,
             date: dateToProcess,
-            deviceType: 'desktop'
+            deviceType: "desktop",
           });
         }
       }
     }
-    
+
     // ============================================================
     // PROCESAR MOBILE
     // ============================================================
-    console.log('\n📱 ===== PROCESANDO MOBILE =====');
-    
+    console.log("\n📱 ===== PROCESANDO MOBILE =====");
+
     for (const dateToProcess of datesToProcess) {
       console.log(`\n📆 Procesando fecha MOBILE: ${dateToProcess}`);
-      
+
       // Validar que la fecha no sea futura
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const processDate = new Date(dateToProcess + 'T00:00:00');
-      processDate.setHours(0, 0, 0, 0);
-      
-      if (processDate > today) {
-        console.log(`⏭️ Saltando fecha futura MOBILE: ${dateToProcess} (no se pueden generar screenshots para fechas futuras)`);
+      if (isFutureDate(dateToProcess)) {
+        console.log(
+          `⏭️ Saltando fecha futura MOBILE: ${dateToProcess} (no se pueden generar screenshots para fechas futuras)`
+        );
         continue;
       }
-      
+
       const jsonFileName = `${dateToProcess}.json`;
       const existingFile = await findJsonFileByName(jsones, jsonFileName);
-      
+
       if (!existingFile) {
-        console.log(`⚠️ No se encontró JSON para ${dateToProcess}, saltando...`);
+        console.log(
+          `⚠️ No se encontró JSON para ${dateToProcess}, saltando...`
+        );
         continue;
       }
-      
+
       const jsonContent = await getJsonFileContent(existingFile.id);
       const jsonData = Array.isArray(jsonContent) ? jsonContent : [];
-      const mobileRecords = jsonData.filter(record => record.deviceType === 'mobile');
-      
+      const mobileRecords = jsonData.filter(
+        (record) => record.deviceType === "mobile"
+      );
+
       if (mobileRecords.length === 0) {
-        console.log(`⚠️ No se encontraron registros mobile para ${dateToProcess}, saltando...`);
+        console.log(
+          `⚠️ No se encontraron registros mobile para ${dateToProcess}, saltando...`
+        );
         continue;
       }
-      
-      console.log(`📊 Se encontraron ${mobileRecords.length} registros mobile para ${dateToProcess}`);
-      
+
+      console.log(
+        `📊 Se encontraron ${mobileRecords.length} registros mobile para ${dateToProcess}`
+      );
+
       for (let i = 0; i < mobileRecords.length; i++) {
         const record = mobileRecords[i];
         const targetFolderId = record.carpeta_id || capturas;
-        const targetFolderName = record.carpeta_nombre || 'capturas (default)';
-        
-        console.log(`\n🎬 Generando screenshot MOBILE ${i + 1}/${mobileRecords.length}`);
-        console.log(`📁 Carpeta destino: ${targetFolderName} (ID: ${targetFolderId})`);
-        
+        const targetFolderName = record.carpeta_nombre || "capturas (default)";
+
+        console.log(
+          `\n🎬 Generando screenshot MOBILE ${i + 1}/${mobileRecords.length}`
+        );
+        console.log(
+          `📁 Carpeta destino: ${targetFolderName} (ID: ${targetFolderId})`
+        );
+
         try {
-          const forwardedHost = req.get('x-forwarded-host');
-          const forwardedProto = req.get('x-forwarded-proto');
-          const host = forwardedHost || req.get('host');
+          const forwardedHost = req.get("x-forwarded-host");
+          const forwardedProto = req.get("x-forwarded-proto");
+          const host = forwardedHost || req.get("host");
           const protocol = forwardedProto || req.protocol;
           const baseUrl = `${protocol}://${host}`;
-          
+
           const jsonDataForScraper = {
-            imagenLateral: record.imagenLateral ? `${baseUrl}${record.imagenLateral}` : null,
-            imagenAncho: record.imagenAncho ? `${baseUrl}${record.imagenAncho}` : null,
-            imagenTop: record.imagenTop ? `${baseUrl}${record.imagenTop}` : null,
+            imagenLateral: record.imagenLateral
+              ? `${baseUrl}${record.imagenLateral}`
+              : null,
+            imagenAncho: record.imagenAncho
+              ? `${baseUrl}${record.imagenAncho}`
+              : null,
+            imagenTop: record.imagenTop
+              ? `${baseUrl}${record.imagenTop}`
+              : null,
             itt: record.itt ? `${baseUrl}${record.itt}` : null,
-            zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null
+            zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null,
           };
+
+          const currentDate = getArgentinaDateString();
+          const targetDate = dateToProcess < currentDate ? dateToProcess : null;
           
-          const currentDate = getLocalDateString();
-          const targetDate = (dateToProcess < currentDate) ? dateToProcess : null;
-          
+          console.log(`🔍 MOBILE - dateToProcess: ${dateToProcess}, currentDate: ${currentDate}, targetDate: ${targetDate}`);
+
           // Obtener tipo de visualización del record (A, B, C para mobile)
           const visualizationType = record.tipo_visualizacion || null;
-          
-          const result = await scrapeLosAndes('mobile', targetFolderId, visualizationType, jsonDataForScraper, targetDate);
+
+          const result = await scrapeLosAndes(
+            "mobile",
+            targetFolderId,
+            visualizationType,
+            jsonDataForScraper,
+            targetDate
+          );
           allResults.mobile.push({
             ...result,
             recordIndex: i,
             date: dateToProcess,
-            deviceType: 'mobile'
+            deviceType: "mobile",
           });
         } catch (error) {
-          console.error(`❌ Error en screenshot MOBILE ${i + 1}:`, error.message);
+          console.error(
+            `❌ Error en screenshot MOBILE ${i + 1}:`,
+            error.message
+          );
           allResults.mobile.push({
             success: false,
             error: error.message,
             recordIndex: i,
             date: dateToProcess,
-            deviceType: 'mobile'
+            deviceType: "mobile",
           });
         }
       }
     }
-    
+
     // ============================================================
-    // CAPTURAR HTML (solo si hay fecha actual)
+    // CAPTURAR HTML (solo si se procesaron screenshots de fecha actual)
     // ============================================================
-    const currentDate = getLocalDateString();
-    const hasCurrentDate = datesToProcess.includes(currentDate);
+    const currentDate = getArgentinaDateString();
     
-    if (hasCurrentDate) {
-      console.log('\n📄 Capturando HTML de Los Andes (fecha actual detectada)...');
+    console.log(`\n🔍 Verificando captura de HTML...`);
+    console.log(`📅 Fecha actual (Argentina): ${currentDate}`);
+    console.log(`📊 Total screenshots desktop: ${allResults.desktop.length}`);
+    console.log(`📊 Total screenshots mobile: ${allResults.mobile.length}`);
+    
+    // Verificar si se procesaron screenshots exitosos para la fecha actual
+    const hasCurrentDateScreenshots = 
+      allResults.desktop.some(r => r.success && r.date === currentDate) ||
+      allResults.mobile.some(r => r.success && r.date === currentDate);
+
+    console.log(`✅ ¿Hay screenshots de fecha actual?: ${hasCurrentDateScreenshots}`);
+
+    if (hasCurrentDateScreenshots) {
+      console.log(
+        "\n📄 Capturando HTML de Los Andes (screenshots de fecha actual generados)..."
+      );
       try {
         await captureAndSaveHTML();
-        console.log('✅ HTML capturado y guardado exitosamente');
+        console.log("✅ HTML capturado y guardado exitosamente");
       } catch (htmlError) {
-        console.error('⚠️ Error al capturar HTML:', htmlError.message);
+        console.error("⚠️ Error al capturar HTML:", htmlError.message);
       }
     } else {
-      console.log('\n⏭️ Saltando captura de HTML (solo fechas pasadas procesadas)');
+      console.log(
+        "\n⏭️ Saltando captura de HTML (no se generaron screenshots para fecha actual)"
+      );
     }
-    
+
     // ============================================================
     // RESPUESTA FINAL
     // ============================================================
-    const totalScreenshots = allResults.desktop.length + allResults.mobile.length;
-    
+    const totalScreenshots =
+      allResults.desktop.length + allResults.mobile.length;
+
     res.json({
       success: true,
       message: `${totalScreenshots} screenshots generados exitosamente (${allResults.desktop.length} desktop, ${allResults.mobile.length} mobile) para ${datesToProcess.length} fecha(s)`,
-      data: allResults
+      data: allResults,
     });
-    
   } catch (error) {
-    console.error('❌ Error generando screenshot:', error.message);
+    console.error("❌ Error generando screenshot:", error.message);
     res.status(500).json({
       success: false,
-      error: 'Error al generar el screenshot',
-      details: error.message
+      error: "Error al generar el screenshot",
+      details: error.message,
     });
   }
 });
@@ -1099,7 +1269,7 @@ app.post('/generate-screenshot', async (req, res) => {
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    error: 'Ruta no encontrada'
+    error: "Ruta no encontrada",
   });
 });
 
@@ -1108,7 +1278,7 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
     success: false,
-    error: 'Error interno del servidor'
+    error: "Error interno del servidor",
   });
 });
 
@@ -1117,5 +1287,5 @@ app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   console.log(`☁️  Almacenamiento: Google Drive (Carpeta ID: ${imagenes})`);
   console.log(`🌎 Zona horaria: America/Argentina/Buenos_Aires (UTC-3)`);
-  console.log(`📅 Fecha actual (Argentina): ${getLocalDateString()}`);
+  console.log(`📅 Fecha actual (Argentina): ${getArgentinaDateString()}`);
 });

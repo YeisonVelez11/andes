@@ -8,6 +8,7 @@
 
 require('dotenv').config();
 const axios = require('axios');
+const { getArgentinaDateString } = require('./date-utils');
 
 // Configuración desde variables de entorno o valores por defecto
 const HOST = process.env.HOST || 'localhost';
@@ -15,12 +16,7 @@ const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://${HOST}:${PORT}`;
 
 // Obtener fecha actual en hora argentina
-const today = new Date();
-const argentinaDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
-const year = argentinaDate.getFullYear();
-const month = String(argentinaDate.getMonth() + 1).padStart(2, '0');
-const day = String(argentinaDate.getDate()).padStart(2, '0');
-const todayString = `${year}-${month}-${day}`;
+const todayString = getArgentinaDateString();
 
 console.log('🚀 Iniciando generación de screenshots...');
 console.log(`📅 Fecha: ${todayString}`);

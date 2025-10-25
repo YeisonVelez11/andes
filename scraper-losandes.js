@@ -5,8 +5,14 @@ const fs = require('fs');
 const path = require('path');
 const streamifier = require('streamifier');
 const sharp = require('sharp');
+const { launchBrowser, configurePage, VIEWPORT_CONFIGS } = require('./puppeteer-config');
+const { getArgentinaDateTime, getArgentinaTimestamp } = require('./date-utils');
 
-// Función para autorizar con Google Drive
+/**
+ * Autoriza y conecta con Google Drive API usando credenciales JWT
+ * @returns {Promise<google.auth.JWT>} Cliente JWT autenticado
+ * @throws {Error} Si las credenciales son inválidas o la autorización falla
+ */
 async function authorize() {
     const jwtClient = new google.auth.JWT(
         process.env.GOOGLE_CLIENT_EMAIL,
@@ -20,7 +26,16 @@ async function authorize() {
     return jwtClient;
 }
 
-// Función para subir archivo a Google Drive
+/**
+ * Sube un buffer a Google Drive
+ * @param {google.drive} driveClient - Cliente de Google Drive autenticado
+ * @param {string} folderId - ID de la carpeta de destino en Google Drive
+ * @param {string} fileName - Nombre del archivo a crear
+ * @param {Buffer} buffer - Buffer con el contenido del archivo
+ * @param {string} mimeType - Tipo MIME del archivo (ej: 'image/png', 'text/html')
+ * @returns {Promise<Object>} Objeto con datos del archivo subido (id, name, webViewLink, webContentLink)
+ * @throws {Error} Si falla la subida a Google Drive
+ */
 async function uploadBufferToDrive(driveClient, folderId, fileName, buffer, mimeType) {
     const fileMetadata = {
         name: fileName,
@@ -46,7 +61,35 @@ async function uploadBufferToDrive(driveClient, folderId, fileName, buffer, mime
     }
 }
 
-// Función principal de scraping
+/**
+ * Función principal para capturar screenshots de Los Andes
+ * @param {string} [deviceType='desktop'] - Tipo de dispositivo: 'desktop' o 'mobile'
+ * @param {string} capturasFolderId - ID de la carpeta de Google Drive donde guardar el screenshot
+ * @param {string|null} [visualizationType=null] - Tipo de visualización: 'A', 'B', 'C', 'D' (desktop) o 'A', 'B', 'C' (mobile)
+ * @param {Object|null} [jsonData=null] - Datos JSON con URLs de imágenes a insertar
+ * @param {string} [jsonData.imagenLateral] - URL de imagen lateral
+ * @param {string} [jsonData.imagenAncho] - URL de imagen ancho
+ * @param {string} [jsonData.imagenTop] - URL de imagen top
+ * @param {string} [jsonData.itt] - URL de imagen ITT
+ * @param {string} [jsonData.zocalo] - URL de zócalo (solo mobile)
+ * @param {string|null} [targetDate=null] - Fecha objetivo en formato YYYY-MM-DD (para cargar HTML histórico)
+ * @returns {Promise<Object>} Objeto con resultado del screenshot
+ * @returns {boolean} return.success - Indica si la operación fue exitosa
+ * @returns {string} return.deviceType - Tipo de dispositivo usado
+ * @returns {string} return.fileName - Nombre del archivo generado
+ * @returns {string} return.driveId - ID del archivo en Google Drive
+ * @returns {string} return.driveLink - Link de visualización en Google Drive
+ * @throws {Error} Si falla el lanzamiento del navegador o la captura del screenshot
+ * @example
+ * // Screenshot actual sin imágenes
+ * await scrapeLosAndes('desktop', 'folderId123', 'A', null, null);
+ * 
+ * // Screenshot histórico con imágenes
+ * await scrapeLosAndes('mobile', 'folderId123', 'B', {
+ *   imagenLateral: 'https://example.com/img1.jpg',
+ *   imagenAncho: 'https://example.com/img2.jpg'
+ * }, '2025-10-20');
+ */
 async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualizationType = null, jsonData = null, targetDate = null) {
     console.log('🚀 Iniciando scraper de Los Andes...');
     console.log(`📱 Tipo de dispositivo: ${deviceType}`);
@@ -62,54 +105,16 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
     
     let browser;
     try {
-        // Configuración de viewport según tipo de dispositivo
-        const isMobile = deviceType === 'mobile';
-        const viewportConfig = isMobile ? {
-            width: 400,
-            height: 820,
-            deviceScaleFactor: 2,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: false
-        } : {
-            width: 1920,
-            height: 1080,
-            deviceScaleFactor: 1,
-            isMobile: false,
-            hasTouch: false,
-            isLandscape: true
-        };
-
-        // Configuración antibaneo de Puppeteer (compatible con Linux sin GUI)
-        browser = await puppeteer.launch({
-            headless: true,
-            args: [
-                "--disable-setuid-sandbox",
-                "--no-sandbox",
-                "--single-process",
-                "--no-zygote",
-                `--window-size=${viewportConfig.width},${viewportConfig.height}`
-            ],
-            headless: "true",
-            executablePath:
-              process.env.NODE_ENV === "production"
-                ? process.env.PUPPETEER_EXECUTABLE_PATH
-                : puppeteer.executablePath(),
-            defaultViewport: viewportConfig,
-        });
-
+        // Lanzar navegador con configuración compartida
+        browser = await launchBrowser(deviceType);
         const page = await browser.newPage();
-
-        // Configuraciones adicionales antibaneo
-        const userAgent = isMobile 
-            ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
-            : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-        await page.setUserAgent(userAgent);
         
-        // Agregar header para ngrok
-        await page.setExtraHTTPHeaders({
-            'ngrok-skip-browser-warning': 'true'
-        });
+        // Configurar página con user agent y headers
+        await configurePage(page, deviceType);
+        
+        // Obtener configuración de viewport para logs
+        const viewportConfig = VIEWPORT_CONFIGS[deviceType];
+        const isMobile = deviceType === 'mobile';
         
         // Ocultar webdriver
         await page.evaluateOnNewDocument(() => {
@@ -772,7 +777,6 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 });
             }, jsonData, xIconBase64);
             
-            console.log('📊 Resultado de inserción de imágenes tipo D:', JSON.stringify(insertResult, null, 2));
             
             // Esperar a que las imágenes se carguen completamente
             await new Promise(resolve => setTimeout(resolve, 3000));
@@ -927,7 +931,6 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             const xIconBase64 = `data:image/png;base64,${xIconBuffer.toString('base64')}`;
             console.log('📷 Imagen x_itt cargada como base64');
             
-            console.log("*********** jsonData antes de page.evaluate:", jsonData);
             // Crear overlay con background gris e imágenes
             const insertResult = await page.evaluate((data, xIconSrc) => {
                 return new Promise((resolve) => {
@@ -1054,7 +1057,6 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 });
             }, jsonData, xIconBase64);
             
-            console.log('📊 Resultado de inserción mobile tipo C:', JSON.stringify(insertResult, null, 2));
             
             // Esperar a que las imágenes se carguen completamente
             await new Promise(resolve => setTimeout(resolve, 3000));
@@ -1496,31 +1498,19 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
 
         // Generar nombre de archivo con timestamp en hora argentina
         // Formato: YYYY-MM-DD-HH-MM-SS-[tipo_visualizacion]-[deviceType].png
-        const now = new Date();
-        
-        // Convertir a hora argentina (America/Argentina/Buenos_Aires)
-        const argentinaDate = new Date(now.toLocaleString('en-US', { 
-            timeZone: 'America/Argentina/Buenos_Aires' 
-        }));
-        
-        // Si hay targetDate (fecha pasada), usar esa fecha en lugar de la actual
-        let year, month, day;
+        let timestamp;
         if (targetDate) {
+            // Si hay targetDate (fecha pasada), usar esa fecha con hora actual de Argentina
+            const dt = getArgentinaDateTime();
             const targetDateObj = new Date(targetDate + 'T00:00:00');
-            year = targetDateObj.getFullYear();
-            month = String(targetDateObj.getMonth() + 1).padStart(2, '0');
-            day = String(targetDateObj.getDate()).padStart(2, '0');
+            const year = targetDateObj.getFullYear();
+            const month = String(targetDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(targetDateObj.getDate()).padStart(2, '0');
+            timestamp = `${year}-${month}-${day}-${dt.hours}-${dt.minutes}-${dt.seconds}`;
         } else {
-            year = argentinaDate.getFullYear();
-            month = String(argentinaDate.getMonth() + 1).padStart(2, '0');
-            day = String(argentinaDate.getDate()).padStart(2, '0');
+            // Usar timestamp completo de Argentina
+            timestamp = getArgentinaTimestamp();
         }
-        
-        // Usar hora argentina para el timestamp
-        const hours = String(argentinaDate.getHours()).padStart(2, '0');
-        const minutes = String(argentinaDate.getMinutes()).padStart(2, '0');
-        const seconds = String(argentinaDate.getSeconds()).padStart(2, '0');
-        const timestamp = `${year}-${month}-${day}-${hours}-${minutes}-${seconds}`;
         
         // Agregar tipo de visualización y deviceType al nombre
         const visualizationSuffix = visualizationType ? `-${visualizationType}` : '';

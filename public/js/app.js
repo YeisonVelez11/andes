@@ -50,14 +50,34 @@ const validSizes = {
   }
 };
 
+// Nombres de tipos de visualización
+const visualizationNames = {
+  'A': 'Lateral / Ancho',
+  'B': 'Lateral',
+  'C': 'Top',
+  'D': 'ITT'
+};
+
+// Helper function para obtener fecha en hora argentina
+function getArgentinaDateString(date = new Date()) {
+  const argentinaDate = new Date(date.toLocaleString('en-US', { 
+    timeZone: 'America/Argentina/Buenos_Aires' 
+  }));
+  const year = argentinaDate.getFullYear();
+  const month = String(argentinaDate.getMonth() + 1).padStart(2, '0');
+  const day = String(argentinaDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // Estado global
 let currentDeviceType = 'desktop';
 let currentVisualizationType = 'A'; // A, B, C, D
 let uploadedFiles = {};
 let dateRange = { start: null, end: null };
-let currentDisplayDate = new Date().toISOString().split('T')[0];
+let currentDisplayDate = getArgentinaDateString();
 let showImages = false; // Por defecto deshabilitado
 let collapsibleInstance = null;
+let isSubmitting = false; // Bandera para prevenir múltiples submits
 
 // Variables para el selector de carpetas
 let folderNavigationStack = [];
@@ -496,30 +516,41 @@ function clearAllPreviews() {
     const input = document.getElementById(inputId);
     if (input) {
       input.value = '';
+      // Actualizar el label de Materialize
+      const wrapper = input.closest('.file-field');
+      if (wrapper) {
+        const pathSpan = wrapper.querySelector('.file-path');
+        if (pathSpan) {
+          pathSpan.value = '';
+        }
+      }
     }
   });
   uploadedFiles = {};
   hideResultMessage();
   M.toast({ html: 'Todas las previsualizaciones han sido limpiadas', classes: 'blue' });
 }
-
 // Manejar envío del formulario
 async function handleFormSubmit(e) {
   e.preventDefault();
   
-  // Validar que al menos una imagen esté seleccionada
+  // Prevenir múltiples submits
+  if (isSubmitting) {
+    console.log('⚠️ Ya hay un submit en proceso, ignorando...');
+    return;
+  }
+  
+  // Validar que haya al menos un archivo
   if (Object.keys(uploadedFiles).length === 0) {
     M.toast({ html: 'Por favor selecciona al menos una imagen', classes: 'red' });
     return;
   }
   
-  // Validar que un rango de fechas esté seleccionado
+  // Validar que haya un rango de fechas seleccionado
   if (!dateRange.start || !dateRange.end) {
-    M.toast({ html: 'Por favor selecciona un rango de fechas', classes: 'orange' });
+    M.toast({ html: 'Por favor selecciona un rango de fechas', classes: 'red' });
     return;
   }
-  
-
   
   // Validar que una carpeta esté seleccionada
   if (!selectedFolderId || !selectedFolderName) {
@@ -528,6 +559,9 @@ async function handleFormSubmit(e) {
     document.getElementById('folderList').scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
+  
+  // Marcar como submitting después de todas las validaciones
+  isSubmitting = true;
 
   // Verificar si solo se deben generar JSONs para primer y último día
   const firstLastOnly = document.getElementById('firstLastOnly').checked;
@@ -597,10 +631,8 @@ async function handleFormSubmit(e) {
       // Recargar galería de imágenes del día actual
       loadImagesForDate(currentDisplayDate);
       
-      // Limpiar formulario después de 2 segundos
-      setTimeout(() => {
-        clearAllPreviews();
-      }, 2000);
+      // Limpiar formulario inmediatamente
+      clearAllPreviews();
     } else {
       showResultMessage('error', `✗ Error: ${result.error}`);
       M.toast({ html: 'Error al subir imágenes', classes: 'red' });
@@ -613,6 +645,8 @@ async function handleFormSubmit(e) {
     // Rehabilitar botón
     submitBtn.disabled = false;
     submitBtn.innerHTML = originalText;
+    // Resetear bandera
+    isSubmitting = false;
   }
 }
 
@@ -796,7 +830,7 @@ function setupImageToggle() {
           loadImagesForDate(currentDisplayDate);
         }
         
-        M.toast({ html: 'Cargando imágenes...', classes: 'blue' });
+        M.toast({ html: 'Cargando campañas...', classes: 'blue' });
       } else {
         // Cerrar el collapsible
         if (collapsibleInstance) {
@@ -907,13 +941,6 @@ async function loadImagesForDateRange(startDate, endDate) {
         entryContent.className = 'card-content';
         
         // Determinar el nombre del tipo de visualización
-        const visualizationNames = {
-          'A': 'Lateral / Ancho',
-          'B': 'Lateral',
-          'C': 'Top',
-          'D': 'ITT'
-        };
-        
         const visualizationType = entry.tipo_visualizacion || 'No especificado';
         const visualizationName = visualizationNames[visualizationType] || visualizationType;
         
@@ -1076,13 +1103,6 @@ async function loadImagesForDate(date) {
       entryContent.className = 'card-content';
       
       // Determinar el nombre del tipo de visualización
-      const visualizationNames = {
-        'A': 'Lateral / Ancho',
-        'B': 'Lateral',
-        'C': 'Top',
-        'D': 'ITT'
-      };
-      
       const visualizationType = entry.tipo_visualizacion || 'No especificado';
       const visualizationName = visualizationNames[visualizationType] || visualizationType;
       
@@ -1209,7 +1229,9 @@ if (generateScreenshotBtn) {
       );
       console.log('📅 Generando screenshots para fechas:', targetDates);
     } else {
-      console.log('📅 No hay rango seleccionado, usando fecha actual');
+      // Si no hay rango seleccionado, usar fecha actual de Argentina
+      targetDates = [getArgentinaDateString()];
+      console.log('📅 No hay rango seleccionado, usando fecha actual (Argentina):', targetDates[0]);
     }
     
     try {
@@ -1432,12 +1454,8 @@ function updateBreadcrumb() {
 
 // Inicializar galería al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
-  // Obtener fecha actual en formato YYYY-MM-DD
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  const todayString = `${year}-${month}-${day}`;
+  // Obtener fecha actual en hora argentina
+  const todayString = getArgentinaDateString();
   
   // Establecer fecha actual como display date
   currentDisplayDate = todayString;
@@ -1448,6 +1466,6 @@ document.addEventListener('DOMContentLoaded', function() {
     displayDateEl.textContent = formatDate(new Date(todayString + 'T00:00:00'));
   }
   
-  console.log('📅 Galería inicializada. Fecha actual:', todayString);
+  console.log('📅 Galería inicializada. Fecha actual (Argentina):', todayString);
   console.log('ℹ️ Marca el checkbox "Mostrar imágenes" para ver las campañas');
 });
