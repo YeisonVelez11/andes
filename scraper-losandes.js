@@ -1,14 +1,10 @@
 require('dotenv').config();
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const puppeteer = require('puppeteer');
 const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
 const streamifier = require('streamifier');
 const sharp = require('sharp');
-
-// Aplicar plugin stealth para evitar detección
-puppeteer.use(StealthPlugin());
 
 // Función para autorizar con Google Drive
 async function authorize() {
