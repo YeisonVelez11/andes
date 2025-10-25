@@ -697,10 +697,13 @@ async function captureAndSaveHTML() {
   ];
   
   for (const config of configs) {
-    console.log(`📱 Capturando HTML ${config.name}...`);
+    console.log(`\n📱 ===== Capturando HTML ${config.name.toUpperCase()} =====`);
+    console.log(`📄 Archivo: ${config.fileName}`);
+    console.log(`📐 Viewport: ${config.viewport.width}x${config.viewport.height}`);
     
     let browser;
     try {
+      console.log('🔧 Lanzando navegador Puppeteer...');
       browser = await puppeteer.launch({
         headless: true,
         args: [
@@ -711,10 +714,14 @@ async function captureAndSaveHTML() {
         ],
         executablePath:puppeteer.executablePath()
       });
+      console.log('✅ Navegador lanzado exitosamente');
       
+      console.log('📄 Creando nueva página...');
       const page = await browser.newPage();
+      console.log('✅ Página creada');
       
       // Configurar viewport con opciones mobile si aplica
+      console.log('🔧 Configurando viewport...');
       if (config.isMobile) {
         await page.setViewport({
           width: config.viewport.width,
@@ -724,24 +731,33 @@ async function captureAndSaveHTML() {
           hasTouch: true,
           isLandscape: false
         });
+        console.log('✅ Viewport mobile configurado');
       } else {
         await page.setViewport(config.viewport);
+        console.log('✅ Viewport desktop configurado');
       }
       
       // Configurar user agent
+      console.log('🔧 Configurando User Agent...');
       await page.setUserAgent(config.userAgent);
+      console.log('✅ User Agent configurado');
       
       // Navegar a la página
+      console.log(`🌐 Navegando a ${url}...`);
       await page.goto(url, {
         waitUntil: 'networkidle2',
         timeout: 60000
       });
+      console.log('✅ Página cargada exitosamente');
       
       // Obtener el HTML completo
+      console.log('📝 Obteniendo contenido HTML...');
       const html = await page.content();
+      console.log(`✅ HTML obtenido (${html.length} caracteres)`);
       
       // Convertir HTML a buffer
       const htmlBuffer = Buffer.from(html, 'utf-8');
+      console.log(`💾 Buffer creado (${htmlBuffer.length} bytes)`);
       
       // Subir a Google Drive
       const fileMetadata = {
@@ -756,6 +772,7 @@ async function captureAndSaveHTML() {
       };
       
       // Buscar si ya existe un archivo con ese nombre
+      console.log(`🔍 Buscando archivo existente: ${config.fileName}...`);
       const existingFiles = await driveClient.files.list({
         q: `name='${config.fileName}' and '${htmlFolderId}' in parents and trashed=false`,
         fields: 'files(id, name)',
@@ -765,6 +782,7 @@ async function captureAndSaveHTML() {
       if (existingFiles.data.files.length > 0) {
         // Actualizar archivo existente
         const fileId = existingFiles.data.files[0].id;
+        console.log(`📝 Archivo existente encontrado (ID: ${fileId}), actualizando...`);
         await driveClient.files.update({
           fileId: fileId,
           media: media
@@ -772,6 +790,7 @@ async function captureAndSaveHTML() {
         console.log(`✅ HTML ${config.name} actualizado: ${config.fileName}`);
       } else {
         // Crear nuevo archivo
+        console.log('📝 Archivo no existe, creando nuevo...');
         await driveClient.files.create({
           requestBody: fileMetadata,
           media: media,
@@ -782,10 +801,13 @@ async function captureAndSaveHTML() {
       
     } catch (error) {
       console.error(`❌ Error capturando HTML ${config.name}:`, error.message);
+      console.error('Stack:', error.stack);
       throw error;
     } finally {
       if (browser) {
+        console.log('🔒 Cerrando navegador...');
         await browser.close();
+        console.log('✅ Navegador cerrado');
       }
     }
   }
