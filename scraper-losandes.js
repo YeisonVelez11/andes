@@ -1494,9 +1494,14 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             }
         }
 
-        // Generar nombre de archivo con timestamp, tipo de visualización y deviceType
+        // Generar nombre de archivo con timestamp en hora argentina
         // Formato: YYYY-MM-DD-HH-MM-SS-[tipo_visualizacion]-[deviceType].png
         const now = new Date();
+        
+        // Convertir a hora argentina (America/Argentina/Buenos_Aires)
+        const argentinaDate = new Date(now.toLocaleString('en-US', { 
+            timeZone: 'America/Argentina/Buenos_Aires' 
+        }));
         
         // Si hay targetDate (fecha pasada), usar esa fecha en lugar de la actual
         let year, month, day;
@@ -1506,14 +1511,15 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             month = String(targetDateObj.getMonth() + 1).padStart(2, '0');
             day = String(targetDateObj.getDate()).padStart(2, '0');
         } else {
-            year = now.getFullYear();
-            month = String(now.getMonth() + 1).padStart(2, '0');
-            day = String(now.getDate()).padStart(2, '0');
+            year = argentinaDate.getFullYear();
+            month = String(argentinaDate.getMonth() + 1).padStart(2, '0');
+            day = String(argentinaDate.getDate()).padStart(2, '0');
         }
         
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
+        // Usar hora argentina para el timestamp
+        const hours = String(argentinaDate.getHours()).padStart(2, '0');
+        const minutes = String(argentinaDate.getMinutes()).padStart(2, '0');
+        const seconds = String(argentinaDate.getSeconds()).padStart(2, '0');
         const timestamp = `${year}-${month}-${day}-${hours}-${minutes}-${seconds}`;
         
         // Agregar tipo de visualización y deviceType al nombre

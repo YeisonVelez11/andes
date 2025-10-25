@@ -16,6 +16,16 @@ const imagenes = "1bbkECY_axw5IttYjgVpRLmi6-EF80fZz";
 const jsones = "1d40AKgKucYUY-CnSqcLd1v8uyXhElk33";
 const capturas = "1So5xiyo-X--XqPK3lh2zZJz7qYOJIGRR";
 
+// Helper function para obtener fecha en hora argentina (America/Argentina/Buenos_Aires)
+function getLocalDateString(date = new Date()) {
+  // Convertir a hora argentina (UTC-3)
+  const argentinaDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+  const year = argentinaDate.getFullYear();
+  const month = String(argentinaDate.getMonth() + 1).padStart(2, '0');
+  const day = String(argentinaDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 
 async function authorize() {
     const jwtClient = new google.auth.JWT(
@@ -677,7 +687,7 @@ async function captureAndSaveHTML() {
   const puppeteer = require('puppeteer');
   const htmlFolderId = '1SWuk-zjLFg40weIaJ_oF3PbPgPDDTy49';
   const url = 'https://www.losandes.com.ar/';
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const today = getLocalDateString(); // YYYY-MM-DD
   
   // Configuraciones para desktop y mobile
   const configs = [
@@ -822,7 +832,7 @@ app.get('/generate-screenshot', async (req, res) => {
     console.log('🚀 GET /generate-screenshot - Llamando a POST internamente...');
     
     // Usar fecha actual por defecto
-    const currentDate = new Date().toISOString().split('T')[0];
+    const currentDate = getLocalDateString();
     
     // Construir URL del servidor
     const protocol = req.protocol;
@@ -862,7 +872,7 @@ app.post('/generate-screenshot', async (req, res) => {
     // Si no se especificaron fechas, usar el día actual
     const datesToProcess = targetDates.length > 0 
       ? targetDates 
-      : [new Date().toISOString().split('T')[0]];
+      : [getLocalDateString()];
     
     console.log(`📅 Fechas a procesar: ${datesToProcess.join(', ')}`);
     console.log(`📱 Generando screenshots para DESKTOP y MOBILE`);
@@ -934,7 +944,7 @@ app.post('/generate-screenshot', async (req, res) => {
             zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null
           };
           
-          const currentDate = new Date().toISOString().split('T')[0];
+          const currentDate = getLocalDateString();
           const targetDate = (dateToProcess < currentDate) ? dateToProcess : null;
           
           const result = await scrapeLosAndes('desktop', targetFolderId, visualizationType, jsonDataForScraper, targetDate);
@@ -1020,7 +1030,7 @@ app.post('/generate-screenshot', async (req, res) => {
             zocalo: record.zocalo ? `${baseUrl}${record.zocalo}` : null
           };
           
-          const currentDate = new Date().toISOString().split('T')[0];
+          const currentDate = getLocalDateString();
           const targetDate = (dateToProcess < currentDate) ? dateToProcess : null;
           
           // Obtener tipo de visualización del record (A, B, C para mobile)
@@ -1049,7 +1059,7 @@ app.post('/generate-screenshot', async (req, res) => {
     // ============================================================
     // CAPTURAR HTML (solo si hay fecha actual)
     // ============================================================
-    const currentDate = new Date().toISOString().split('T')[0];
+    const currentDate = getLocalDateString();
     const hasCurrentDate = datesToProcess.includes(currentDate);
     
     if (hasCurrentDate) {
@@ -1106,4 +1116,6 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   console.log(`☁️  Almacenamiento: Google Drive (Carpeta ID: ${imagenes})`);
+  console.log(`🌎 Zona horaria: America/Argentina/Buenos_Aires (UTC-3)`);
+  console.log(`📅 Fecha actual (Argentina): ${getLocalDateString()}`);
 });

@@ -14,11 +14,12 @@ const HOST = process.env.HOST || 'localhost';
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://${HOST}:${PORT}`;
 
-// Obtener fecha actual
+// Obtener fecha actual en hora argentina
 const today = new Date();
-const year = today.getFullYear();
-const month = String(today.getMonth() + 1).padStart(2, '0');
-const day = String(today.getDate()).padStart(2, '0');
+const argentinaDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+const year = argentinaDate.getFullYear();
+const month = String(argentinaDate.getMonth() + 1).padStart(2, '0');
+const day = String(argentinaDate.getDate()).padStart(2, '0');
 const todayString = `${year}-${month}-${day}`;
 
 console.log('🚀 Iniciando generación de screenshots...');
