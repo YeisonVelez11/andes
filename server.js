@@ -791,6 +791,42 @@ async function captureAndSaveHTML() {
   }
 }
 
+// Endpoint GET que llama al POST de generate-screenshot (simplificado)
+app.get('/generate-screenshot', async (req, res) => {
+  try {
+    console.log('🚀 GET /generate-screenshot - Llamando a POST internamente...');
+    
+    // Usar fecha actual por defecto
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    // Construir URL del servidor
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+    
+    // Llamar al endpoint POST internamente
+    const axios = require('axios');
+    const response = await axios.post(`${baseUrl}/generate-screenshot`, {
+      targetDates: [currentDate]
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // Retornar la respuesta del POST
+    res.json(response.data);
+    
+  } catch (error) {
+    console.error('❌ Error en GET /generate-screenshot:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Error al generar screenshots',
+      details: error.message
+    });
+  }
+});
+
 // Endpoint para generar screenshot de Los Andes
 app.post('/generate-screenshot', async (req, res) => {
   try {
