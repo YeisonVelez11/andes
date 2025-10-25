@@ -94,11 +94,12 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 "--no-zygote",
                 `--window-size=${viewportConfig.width},${viewportConfig.height}`
             ],
+            headless: "true",
+            executablePath:
+              process.env.NODE_ENV === "production"
+                ? process.env.PUPPETEER_EXECUTABLE_PATH
+                : puppeteer.executablePath(),
             defaultViewport: viewportConfig,
-            executablePath: puppeteer.executablePath(),
-            protocolTimeout: 180000, // 3 minutos
-            ignoreHTTPSErrors: true,
-            dumpio: false
         });
 
         const page = await browser.newPage();
