@@ -854,10 +854,13 @@ async function captureAndSaveHTML() {
       // Navegar a la página
       console.log(`🌐 Navegando a ${url}...`);
       await page.goto(url, {
-        waitUntil: "networkidle2",
-        timeout: 60000,
+        waitUntil: "domcontentloaded",
+        timeout: 90000,
       });
       console.log("✅ Página cargada exitosamente");
+      
+      // Esperar un poco más para contenido dinámico
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       // Obtener el HTML completo
       console.log("📝 Obteniendo contenido HTML...");
