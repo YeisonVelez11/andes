@@ -88,18 +88,10 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         browser = await puppeteer.launch({
             headless: true,
             args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--single-process',
-                '--no-zygote',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--disable-gpu',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
+                "--disable-setuid-sandbox",
+                "--no-sandbox",
+                "--single-process",
+                "--no-zygote",
                 `--window-size=${viewportConfig.width},${viewportConfig.height}`
             ],
             defaultViewport: viewportConfig,

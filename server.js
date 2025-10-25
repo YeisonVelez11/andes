@@ -704,13 +704,10 @@ async function captureAndSaveHTML() {
       browser = await puppeteer.launch({
         headless: true,
         args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--single-process',
-          '--no-zygote',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-accelerated-2d-canvas'
+          "--disable-setuid-sandbox",
+          "--no-sandbox",
+          "--single-process",
+          "--no-zygote",
         ],
         executablePath:puppeteer.executablePath()
       });
