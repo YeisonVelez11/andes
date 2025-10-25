@@ -827,6 +827,7 @@ async function captureAndSaveHTML() {
 
   // Configuraciones para desktop y mobile
   const deviceTypes = ["desktop", "mobile"];
+  const results = { desktop: false, mobile: false };
 
   for (const deviceType of deviceTypes) {
     const fileName = `${today}_${deviceType}.html`;
@@ -849,15 +850,59 @@ async function captureAndSaveHTML() {
       // Configurar página con user agent y headers
       console.log("🔧 Configurando página...");
       await configurePage(page, deviceType);
+      
+      // User agents alternativos para reintentos
+      const alternativeUserAgents = [
+        null, // Usar el default
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0'
+      ];
+      
       console.log("✅ Página configurada");
 
-      // Navegar a la página
+      // Navegar a la página con reintentos y diferentes estrategias
       console.log(`🌐 Navegando a ${url}...`);
-      await page.goto(url, {
-        waitUntil: "domcontentloaded",
-        timeout: 90000,
-      });
-      console.log("✅ Página cargada exitosamente");
+      let navigationSuccess = false;
+      const maxRetries = 5;
+      const strategies = [
+        { waitUntil: "domcontentloaded", timeout: 90000, name: "domcontentloaded (90s)" },
+        { waitUntil: "domcontentloaded", timeout: 120000, name: "domcontentloaded (120s)" },
+        { waitUntil: "load", timeout: 120000, name: "load (120s)" },
+        { waitUntil: "networkidle0", timeout: 120000, name: "networkidle0 (120s)" },
+        { waitUntil: "domcontentloaded", timeout: 150000, name: "domcontentloaded (150s)" }
+      ];
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const strategy = strategies[attempt - 1];
+          console.log(`📡 Intento ${attempt}/${maxRetries} - Estrategia: ${strategy.name}`);
+          
+          // Cambiar user agent en intentos posteriores
+          if (attempt > 1 && alternativeUserAgents[attempt - 1]) {
+            console.log(`🔄 Cambiando user agent...`);
+            await page.setUserAgent(alternativeUserAgents[attempt - 1]);
+          }
+          
+          await page.goto(url, {
+            waitUntil: strategy.waitUntil,
+            timeout: strategy.timeout,
+          });
+          navigationSuccess = true;
+          console.log("✅ Página cargada exitosamente");
+          break;
+        } catch (navError) {
+          console.log(`⚠️ Intento ${attempt} falló: ${navError.message}`);
+          if (attempt < maxRetries) {
+            const waitTime = attempt * 15000; // 15s, 30s, 45s, 60s
+            console.log(`⏳ Esperando ${waitTime/1000} segundos antes de reintentar...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          } else {
+            throw navError;
+          }
+        }
+      }
       
       // Esperar un poco más para contenido dinámico
       await new Promise(resolve => setTimeout(resolve, 3000));
@@ -912,10 +957,11 @@ async function captureAndSaveHTML() {
         });
         console.log(`✅ HTML ${deviceType} creado: ${fileName}`);
       }
+      results[deviceType] = true;
     } catch (error) {
       console.error(`❌ Error capturando HTML ${deviceType}:`, error.message);
-      console.error("Stack:", error.stack);
-      throw error;
+      console.log(`⚠️ Continuando con el siguiente dispositivo...`);
+      results[deviceType] = false;
     } finally {
       if (browser) {
         console.log("🔒 Cerrando navegador...");
@@ -923,6 +969,26 @@ async function captureAndSaveHTML() {
         console.log("✅ Navegador cerrado");
       }
     }
+  }
+  
+  // Resumen final
+  console.log("\n📊 ===== RESUMEN DE CAPTURA DE HTML =====");
+  console.log(`Desktop: ${results.desktop ? '✅ Exitoso' : '❌ Falló'}`);
+  console.log(`Mobile: ${results.mobile ? '✅ Exitoso' : '❌ Falló'}`);
+  
+  if (results.desktop && results.mobile) {
+    console.log("\n🎉 Ambos HTMLs capturados exitosamente");
+  } else if (!results.desktop && !results.mobile) {
+    console.log("\n❌ CRÍTICO: No se pudo capturar ningún HTML");
+    console.log("❌ Posibles causas:");
+    console.log("   - Los Andes está bloqueando la IP del servidor");
+    console.log("   - Problemas de conectividad del servidor");
+    console.log("   - Firewall bloqueando conexiones salientes");
+    throw new Error("No se pudo capturar HTML para ningún dispositivo después de múltiples intentos");
+  } else {
+    console.log("\n⚠️ ADVERTENCIA: Solo se capturó HTML para uno de los dispositivos");
+    const failed = results.desktop ? 'Mobile' : 'Desktop';
+    console.log(`⚠️ Falló: ${failed}`);
   }
 }
 
