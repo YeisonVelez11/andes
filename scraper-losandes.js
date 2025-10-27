@@ -1559,7 +1559,9 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         return result;
 
     } catch (error) {
-        console.error('❌ Error durante el scraping:', error);
+        console.error('❌ Error durante el scraping:', error.message);
+        console.error('📍 Stack trace:', error.stack);
+        console.error('📊 Error completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         throw error;
     } finally {
         if (browser) {
