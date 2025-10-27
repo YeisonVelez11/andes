@@ -34,7 +34,13 @@
    - `getArgentinaDateTime()` - Fecha y hora completa
    - `getArgentinaTimestamp()` - Timestamp formateado
 
-5. **`public/js/app.js`** - Frontend
+5. **`navigation-strategies.js`** - Sistema de reintentos y estrategias ⭐ NUEVO
+   - 5 estrategias de navegación (domcontentloaded, load, networkidle0)
+   - 5 user agents alternativos para evitar bloqueos
+   - Función compartida `navigateWithStrategies()`
+   - Ver documentación completa en `RETRY_SYSTEM.md`
+
+6. **`public/js/app.js`** - Frontend
    - Gestión de formularios
    - Subida de imágenes
    - Visualización de galería
@@ -42,7 +48,29 @@
 
 ## 🔧 Problemas Resueltos en Esta Sesión
 
-### 1. **Captura de HTML para fechas futuras** ✅
+### 1. **Sistema de Reintentos Robusto** ✅ ⭐ NUEVO
+**Problema:** En Render.com, los screenshots y HTML fallaban por timeouts de navegación.
+
+**Solución:**
+- Creado módulo `navigation-strategies.js` con 5 estrategias de navegación
+- Implementado sistema de reintentos con esperas incrementales (15s, 30s, 45s, 60s)
+- 5 user agents alternativos para evitar bloqueos
+- Función compartida `navigateWithStrategies()` usada en screenshots y HTML
+- Resúmenes detallados de éxitos/fallos
+- Errores críticos si todo falla
+
+**Detalles:**
+```
+Intento 1: domcontentloaded (90s)
+Intento 2: domcontentloaded (120s) + cambio user agent
+Intento 3: load (120s) + cambio user agent
+Intento 4: networkidle0 (120s) + cambio user agent
+Intento 5: domcontentloaded (150s) + cambio user agent
+```
+
+**Ver documentación completa en:** `RETRY_SYSTEM.md`
+
+### 2. **Captura de HTML para fechas futuras** ✅
 **Problema:** El sistema capturaba HTML incluso cuando se procesaban fechas futuras.
 
 **Solución:**
@@ -308,13 +336,15 @@ Simplemente menciona:
 
 ### Archivos clave para revisar:
 1. `PROJECT_CONTEXT.md` (este archivo)
-2. `API_DOCUMENTATION.md`
-3. `DEPLOYMENT.md`
-4. `server.js`
-5. `scraper-losandes.js`
+2. `RETRY_SYSTEM.md` ⭐ NUEVO - Sistema de reintentos completo
+3. `API_DOCUMENTATION.md`
+4. `DEPLOYMENT.md`
+5. `server.js`
+6. `scraper-losandes.js`
+7. `navigation-strategies.js` ⭐ NUEVO
 
 ---
 
-**Última actualización:** 2025-10-24  
-**Versión del proyecto:** 1.0  
-**Estado:** Producción estable ✅
+**Última actualización:** 2025-10-25  
+**Versión del proyecto:** 2.0  
+**Estado:** Producción estable con sistema de reintentos robusto ✅
