@@ -28,6 +28,27 @@ async function authorize() {
 }
 
 /**
+ * Espera a que todas las imágenes de la página terminen de cargar
+ * @param {Object} page - Página de Puppeteer
+ * @param {string} context - Contexto para logging (ej: 'página en vivo', 'HTML histórico')
+ * @returns {Promise<void>}
+ */
+async function waitForAllImages(page, context = 'página') {
+    console.log(`🖼️ Esperando a que todas las imágenes de ${context} carguen...`);
+    await page.evaluate(() => {
+        return Promise.all(
+            Array.from(document.images)
+                .filter(img => !img.complete)
+                .map(img => new Promise(resolve => {
+                    img.addEventListener('load', resolve);
+                    img.addEventListener('error', resolve);
+                }))
+        );
+    });
+    console.log(`✅ Todas las imágenes de ${context} han cargado`);
+}
+
+/**
  * Sube un buffer a Google Drive
  * @param {google.drive} driveClient - Cliente de Google Drive autenticado
  * @param {string} folderId - ID de la carpeta de destino en Google Drive
@@ -217,6 +238,9 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 // Esperar otro momento para que los cambios se apliquen
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
+                // Esperar a que todas las imágenes del HTML histórico carguen
+                await waitForAllImages(page, 'HTML histórico');
+                
                 console.log('✅ HTML histórico cargado exitosamente');
                 console.log(`📱 Viewport configurado: ${isMobile ? 'Mobile' : 'Desktop'} (${viewportConfig.width}x${viewportConfig.height})`);
                 
@@ -229,6 +253,10 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                     waitUntil: 'domcontentloaded',
                     timeout: 90000
                 });
+                
+                // Esperar a que las imágenes carguen en el fallback también
+                await waitForAllImages(page, 'página en vivo (fallback)');
+                
                 console.log('✅ Página en vivo cargada como fallback');
             }
         } else {
@@ -239,8 +267,11 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             console.log('✅ Página cargada exitosamente');
         }
 
-        // Esperar un poco para que todo cargue completamente
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Esperar a que todas las imágenes de la página se carguen completamente
+        await waitForAllImages(page, 'la página');
+        
+        // Esperar un poco adicional para que todo se renderice completamente
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         // Remover publicidad (aplica a todos los tipos de visualización y dispositivos)
         console.log('🧹 Removiendo publicidades...');
