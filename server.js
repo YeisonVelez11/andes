@@ -8,7 +8,7 @@ const { google } = require("googleapis");
 const streamifier = require("streamifier");
 const { scrapeLosAndes } = require("./scraper-losandes");
 const { launchBrowser, configurePage } = require("./puppeteer-config");
-const { getArgentinaDateString } = require("./date-utils");
+const { getArgentinaDateString, getArgentinaISOString } = require("./date-utils");
 const { navigateWithStrategies } = require("./navigation-strategies");
 
 const app = express();
@@ -460,7 +460,8 @@ app.post("/upload", async (req, res) => {
               ? `/image/${uploadedFiles.zocalo.driveId}`
               : null,
             deviceType: deviceType,
-            uploadedAt: new Date(date + "T00:00:00").toISOString(), // Usar fecha de la campaña
+            campaignDate: getArgentinaISOString(date), // Fecha de la campaña (día seleccionado)
+            uploadedAt: new Date().toISOString(), // Timestamp real de cuando se subió
           };
 
           // Agregar tipo_visualización si está definido (desktop: A,B,C,D / mobile: A,B,C)
@@ -541,7 +542,8 @@ app.post("/upload", async (req, res) => {
               ? `/image/${uploadedFiles.zocalo.driveId}`
               : null,
             deviceType: deviceType,
-            uploadedAt: new Date(date + "T00:00:00").toISOString(), // Usar fecha de la campaña
+            campaignDate: getArgentinaISOString(date), // Fecha de la campaña (día seleccionado)
+            uploadedAt: new Date().toISOString(), // Timestamp real de cuando se subió
           };
 
           // Agregar tipo_visualización si está definido (desktop: A,B,C,D / mobile: A,B,C)

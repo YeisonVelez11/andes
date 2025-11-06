@@ -53,8 +53,27 @@ function getArgentinaTimestamp(date = new Date()) {
   return `${dt.year}-${dt.month}-${dt.day}-${dt.hours}-${dt.minutes}-${dt.seconds}`;
 }
 
+/**
+ * Convierte una fecha YYYY-MM-DD a ISO string con hora de Argentina (medianoche)
+ * @param {string} dateString - Fecha en formato YYYY-MM-DD
+ * @returns {string} ISO string con la fecha a medianoche en hora de Argentina
+ */
+function getArgentinaISOString(dateString) {
+  // Crear fecha en hora de Argentina a las 00:00:00
+  // Argentina está en UTC-3, entonces medianoche en Argentina (00:00) es 03:00 UTC del mismo día
+  // Por ejemplo: 2025-11-05 00:00:00 Argentina = 2025-11-05 03:00:00 UTC
+  const [year, month, day] = dateString.split('-').map(Number);
+  
+  // Crear la fecha a las 12:00 del mediodía en Argentina para evitar problemas de zona horaria
+  // Esto asegura que siempre se muestre el día correcto sin importar la zona horaria del navegador
+  const utcDate = new Date(Date.UTC(year, month - 1, day, 15, 0, 0, 0)); // 15:00 UTC = 12:00 Argentina
+  
+  return utcDate.toISOString();
+}
+
 module.exports = {
   getArgentinaDateString,
   getArgentinaDateTime,
-  getArgentinaTimestamp
+  getArgentinaTimestamp,
+  getArgentinaISOString
 };

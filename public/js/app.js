@@ -623,7 +623,7 @@ async function handleFormSubmit(e) {
         <strong>Dispositivo:</strong> ${result.deviceType}<br>
         <strong>Archivos subidos:</strong> ${Object.keys(result.files).length}<br>
         ${jsonFilesInfo}
-        <strong>Fecha:</strong> ${new Date(result.uploadedAt).toLocaleString()}
+        <strong>Fecha campaña:</strong> ${new Date(result.campaignDate || result.uploadedAt).toLocaleDateString()}
       `);
       
       M.toast({ html: '¡Imágenes y archivos JSON creados exitosamente!', classes: 'green' });
@@ -948,8 +948,15 @@ async function loadImagesForDateRange(startDate, endDate) {
           <span class="card-title">
             Entrada #${index + 1}
             <span class="grey-text" style="font-size: 0.9rem; font-weight: normal;">
-              (${new Date(entry.uploadedAt).toLocaleString()})
+              (${new Date(entry.campaignDate || entry.uploadedAt).toLocaleDateString()})
             </span>
+            ${entry.uploadedAt ? `
+              <br>
+              <span class="grey-text" style="font-size: 0.75rem; font-weight: normal;">
+                <i class="material-icons tiny" style="vertical-align: middle; font-size: 14px;">schedule</i>
+                Subido: ${new Date(entry.uploadedAt).toLocaleString()}
+              </span>
+            ` : ''}
           </span>
           <div style="margin-top: 10px; margin-bottom: 15px;">
             ${entry.campana ? `
@@ -1110,8 +1117,15 @@ async function loadImagesForDate(date) {
         <span class="card-title">
           Entrada #${index + 1}
           <span class="grey-text" style="font-size: 0.9rem; font-weight: normal;">
-            (${new Date(entry.uploadedAt).toLocaleString()})
+            (${new Date(entry.campaignDate || entry.uploadedAt).toLocaleDateString()})
           </span>
+          ${entry.uploadedAt ? `
+            <br>
+            <span class="grey-text" style="font-size: 0.75rem; font-weight: normal;">
+              <i class="material-icons tiny" style="vertical-align: middle; font-size: 14px;">schedule</i>
+              Subido: ${new Date(entry.uploadedAt).toLocaleString()}
+            </span>
+          ` : ''}
         </span>
         <div style="margin-top: 10px; margin-bottom: 15px;">
           ${entry.campana ? `
