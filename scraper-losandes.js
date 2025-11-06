@@ -319,8 +319,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 window.scrollTo(0, 250);
             });
             
-            // Esperar un poco después del scroll
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Esperar más tiempo después del scroll para asegurar carga completa
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
             // Insertar imágenes en la página
             const insertResult = await page.evaluate((data) => {
@@ -474,8 +474,17 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             
             console.log('📊 Resultado de inserción de imágenes:', JSON.stringify(insertResult, null, 2));
             
-            // Esperar a que las imágenes se carguen completamente
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Esperar a que las imágenes se carguen completamente y se apliquen los estilos
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // Verificar que las imágenes estén realmente cargadas
+            await page.evaluate(() => {
+                const imgLateral = document.getElementById('inserted-imagen-lateral');
+                const imgAncho = document.getElementById('inserted-imagen-ancho');
+                if (imgLateral) console.log('✅ Imagen lateral confirmada en DOM');
+                if (imgAncho) console.log('✅ Imagen ancho confirmada en DOM');
+            });
+            
             console.log('✅ Proceso de inserción de imágenes completado');
         }
 
@@ -504,8 +513,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                     window.scrollTo(0, scrollPos);
                 }, scrollPosition);
                 
-                // Esperar un poco después del scroll
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Esperar más tiempo después del scroll para asegurar carga completa
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 // Insertar imagen lateral
                 const insertResult = await page.evaluate((data) => {
@@ -567,8 +576,15 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 
                 console.log('📊 Resultado de inserción de imágenes tipo B:', JSON.stringify(insertResult, null, 2));
                 
-                // Esperar a que las imágenes se carguen completamente
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                // Esperar a que las imágenes se carguen completamente y se apliquen los estilos
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                // Verificar que la imagen esté realmente cargada
+                await page.evaluate(() => {
+                    const imgLateral = document.getElementById('inserted-imagen-lateral-tipo-b');
+                    if (imgLateral) console.log('✅ Imagen lateral tipo B confirmada en DOM');
+                });
+                
                 console.log('✅ Proceso de inserción de imágenes tipo B completado');
             }
         }
@@ -583,8 +599,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 window.scrollTo(0, 0);
             });
             
-            // Esperar un poco después del scroll
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Esperar más tiempo después del scroll para asegurar carga completa
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
             // Agregar margin-top al body para tipo C
             console.log('📐 Agregando margin-top: 100px al body...');
@@ -642,8 +658,15 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             
             console.log('📊 Resultado de inserción de imágenes tipo C:', JSON.stringify(insertResult, null, 2));
             
-            // Esperar a que las imágenes se carguen completamente
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Esperar a que las imágenes se carguen completamente y se apliquen los estilos
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // Verificar que la imagen esté realmente cargada
+            await page.evaluate(() => {
+                const imgTop = document.getElementById('inserted-imagen-top');
+                if (imgTop) console.log('✅ Imagen top tipo C confirmada en DOM');
+            });
+            
             console.log('✅ Proceso de inserción de imágenes tipo C completado');
         }
 
@@ -665,8 +688,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 window.scrollTo(0, 0);
             });
             
-            // Esperar un poco después del scroll
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Esperar más tiempo después del scroll para asegurar carga completa
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
             // Leer la imagen x_itt.png y convertirla a base64
             const xIconPath = path.join(__dirname, 'public', 'images', 'x_itt.png');
@@ -798,8 +821,17 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             }, jsonData, xIconBase64);
             
             
-            // Esperar a que las imágenes se carguen completamente
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Esperar a que las imágenes se carguen completamente y se apliquen los estilos
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // Verificar que las imágenes estén realmente cargadas
+            await page.evaluate(() => {
+                const imgITT = document.getElementById('inserted-imagen-itt');
+                const iconX = document.getElementById('inserted-icon-x');
+                if (imgITT) console.log('✅ Imagen ITT tipo D confirmada en DOM');
+                if (iconX) console.log('✅ Icono X tipo D confirmado en DOM');
+            });
+            
             console.log('✅ Proceso de inserción de imágenes tipo D completado');
         }
         
@@ -829,8 +861,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                     window.scrollTo(0, scrollPos);
                 }, scrollPosition);
                 
-                // Esperar a que se complete el scroll
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Esperar más tiempo a que se complete el scroll y cargue todo
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 // Insertar imagen ancho
                 const insertResult = await page.evaluate((data) => {
@@ -915,8 +947,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 
                 console.log('📊 Resultado de inserción mobile tipo A:', JSON.stringify(insertResult, null, 2));
                 
-                // Esperar a que la imagen se cargue completamente
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Esperar a que la imagen se cargue completamente y se apliquen los estilos
+                await new Promise(resolve => setTimeout(resolve, 4000));
                 console.log('✅ Proceso de inserción mobile tipo A completado');
             } else {
                 console.log('⚠️ No se pudo hacer scroll al elemento mobile');
@@ -942,8 +974,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 window.scrollTo(0, 0);
             });
             
-            // Esperar un poco después del scroll
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Esperar más tiempo después del scroll para asegurar carga completa
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
             // Leer la imagen x_itt.png y convertirla a base64
             const xIconPath = path.join(__dirname, 'public', 'images', 'x_itt.png');
@@ -1078,8 +1110,17 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             }, jsonData, xIconBase64);
             
             
-            // Esperar a que las imágenes se carguen completamente
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Esperar a que las imágenes se carguen completamente y se apliquen los estilos
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // Verificar que las imágenes estén realmente cargadas
+            await page.evaluate(() => {
+                const imgITT = document.getElementById('inserted-imagen-itt-mobile');
+                const iconX = document.getElementById('inserted-icon-x-mobile');
+                if (imgITT) console.log('✅ Imagen ITT mobile tipo C confirmada en DOM');
+                if (iconX) console.log('✅ Icono X mobile tipo C confirmado en DOM');
+            });
+            
             console.log('✅ Proceso de inserción mobile tipo C completado');
         }
         
@@ -1109,8 +1150,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                     window.scrollTo(0, scrollPos - 200);
                 }, scrollPosition);
                 
-                // Esperar a que se complete el scroll
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Esperar más tiempo a que se complete el scroll y cargue todo
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 console.log('✅ Scroll completado');
             }
             
@@ -1277,8 +1318,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             
             console.log('📊 Resultado de inserción mobile tipo B:', JSON.stringify(insertResult, null, 2));
             
-            // Esperar a que las imágenes se carguen completamente
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Esperar a que las imágenes se carguen completamente y se apliquen los estilos
+            await new Promise(resolve => setTimeout(resolve, 4000));
             
             console.log('✅ Proceso de inserción mobile tipo B completado');
         }
