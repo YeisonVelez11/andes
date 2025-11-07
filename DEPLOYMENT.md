@@ -289,55 +289,30 @@ sudo certbot --nginx -d tu-dominio.com
 sudo certbot renew --dry-run
 ```
 
-### 8. Configurar PM2 para Gestión de Procesos
+### 8. Configurar PM2 para Gestión de Procesos y Cronjobs
+
+El archivo `ecosystem.config.js` ya está incluido en el proyecto y configura:
+- **Servidor web** (siempre activo)
+- **Cronjob 6:00 AM** (genera screenshots diarios)
+- **Cronjob 2:00 PM** (genera screenshots diarios)
+
+**Iniciar aplicación con PM2:**
 
 ```bash
 # Cambiar a usuario andes
 sudo su - andes
 cd /var/www/andes
 
-# Crear archivo de configuración PM2
-nano ecosystem.config.js
-```
-
-**Contenido de `ecosystem.config.js`:**
-
-```javascript
-module.exports = {
-  apps: [{
-    name: 'andes',
-    script: './server.js',
-    instances: 1,
-    exec_mode: 'fork',
-    autorestart: true,
-    watch: false,
-    max_memory_restart: '1G',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 3000
-    },
-    error_file: './logs/pm2-error.log',
-    out_file: './logs/pm2-out.log',
-    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-    merge_logs: true,
-    time: true
-  }]
-};
-```
-
-**Iniciar aplicación con PM2:**
-
-```bash
 # Crear directorio de logs
 mkdir -p /var/www/andes/logs
 
-# Iniciar aplicación
+# Iniciar todas las aplicaciones (servidor + cronjobs)
 pm2 start ecosystem.config.js
 
 # Ver logs
-pm2 logs andes
+pm2 logs
 
-# Ver estado
+# Ver estado de todos los procesos
 pm2 status
 
 # Guardar configuración para reinicio automático
@@ -345,7 +320,42 @@ pm2 save
 
 # Configurar inicio automático al arrancar el servidor
 pm2 startup
-# Ejecutar el comando que PM2 te muestre
+# Ejecutar el comando que PM2 te muestre (algo como):
+# sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u andes --hp /var/www/andes
+```
+
+**Verificar cronjobs:**
+
+```bash
+# Ver próxima ejecución de los cronjobs
+pm2 list
+
+# Ver logs específicos de cada proceso
+pm2 logs andes-server        # Servidor web
+pm2 logs screenshots-6am      # Cronjob 6 AM
+pm2 logs screenshots-2pm      # Cronjob 2 PM
+
+# Ejecutar manualmente el script de screenshots (para probar)
+node generate-screenshots-today.js
+```
+
+**Configuración de cronjobs en `ecosystem.config.js`:**
+
+Los cronjobs están configurados con sintaxis cron:
+- `0 6 * * *` = Todos los días a las 6:00 AM
+- `0 14 * * *` = Todos los días a las 2:00 PM (14:00)
+
+**Nota importante:** Los cronjobs de PM2 usan la zona horaria del servidor. Asegúrate de que el servidor esté configurado en la zona horaria de Argentina:
+
+```bash
+# Verificar zona horaria actual
+timedatectl
+
+# Cambiar a zona horaria de Argentina (si es necesario)
+sudo timedatectl set-timezone America/Argentina/Buenos_Aires
+
+# Verificar cambio
+date
 ```
 
 ### 9. Configurar Firewall

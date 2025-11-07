@@ -94,6 +94,11 @@ async function generateScreenshots() {
   } catch (error) {
     console.error('❌ Error:', error.message);
     console.error('');
+    
+    // Mostrar stack trace completo para debugging
+    console.error('Stack trace:');
+    console.error(error.stack);
+    console.error('');
 
     if (error.code === 'ECONNREFUSED') {
       console.error('No se pudo conectar con el servidor.');

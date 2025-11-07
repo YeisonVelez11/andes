@@ -1,6 +1,7 @@
 node_modules/
 uploads/
 *.log
+logs/
 .env
 .DS_Store
 token.json
