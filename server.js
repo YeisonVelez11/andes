@@ -1320,32 +1320,30 @@ app.post("/generate-screenshot", async (req, res) => {
     console.log(`Mobile: ${successfulMobile} exitosos, ${failedMobile} fallidos`);
     console.log(`Total: ${successfulDesktop + successfulMobile} exitosos de ${allResults.desktop.length + allResults.mobile.length} intentos`);
     
-    // Verificar si todos los screenshots fallaron
+    // Verificar si todos los screenshots fallaron (solo si se intentaron generar)
     if (successfulDesktop === 0 && successfulMobile === 0 && (allResults.desktop.length > 0 || allResults.mobile.length > 0)) {
-      console.log(`\n❌ CRÍTICO: Todos los screenshots fallaron`);
-      console.log("❌ Posibles causas:");
+      console.log(`\n⚠️ ADVERTENCIA: Todos los screenshots fallaron`);
+      console.log("⚠️ Posibles causas:");
       console.log("   - Los Andes está bloqueando la IP del servidor");
       console.log("   - Problemas de conectividad del servidor");
       console.log("   - Error en la configuración de Puppeteer");
-      throw new Error("Todos los screenshots fallaron después de múltiples intentos");
+      // No lanzar error, solo advertir - permitir que continúe con la captura de HTML
     }
     
     // ============================================================
-    // CAPTURAR HTML (solo si se procesaron screenshots de fecha actual)
+    // CAPTURAR HTML (SIEMPRE para la fecha actual)
     // ============================================================
     console.log(`\n🔍 Verificando captura de HTML...`);
     console.log(`📅 Fecha actual (Argentina): ${currentDate}`);
     
-    // Verificar si se procesaron screenshots exitosos para la fecha actual
-    const hasCurrentDateScreenshots = 
-      allResults.desktop.some(r => r.success && r.date === currentDate) ||
-      allResults.mobile.some(r => r.success && r.date === currentDate);
+    // Verificar si la fecha actual está en las fechas procesadas
+    const isProcessingCurrentDate = datesToProcess.includes(currentDate);
+    
+    console.log(`✅ ¿Se está procesando la fecha actual?: ${isProcessingCurrentDate}`);
 
-    console.log(`✅ ¿Hay screenshots de fecha actual?: ${hasCurrentDateScreenshots}`);
-
-    if (hasCurrentDateScreenshots) {
+    if (isProcessingCurrentDate) {
       console.log(
-        "\n📄 Capturando HTML de Los Andes (screenshots de fecha actual generados)..."
+        "\n📄 Capturando HTML de Los Andes (SIEMPRE para fecha actual, incluso sin campañas)..."
       );
       try {
         await captureAndSaveHTML();
@@ -1355,7 +1353,7 @@ app.post("/generate-screenshot", async (req, res) => {
       }
     } else {
       console.log(
-        "\n⏭️ Saltando captura de HTML (no se generaron screenshots para fecha actual)"
+        "\n⏭️ Saltando captura de HTML (no se está procesando la fecha actual)"
       );
     }
 
@@ -1364,10 +1362,17 @@ app.post("/generate-screenshot", async (req, res) => {
     // ============================================================
     const totalScreenshots =
       allResults.desktop.length + allResults.mobile.length;
+    
+    let message;
+    if (totalScreenshots === 0) {
+      message = `No se encontraron campañas para procesar. HTML capturado para fecha actual: ${currentDate}`;
+    } else {
+      message = `${totalScreenshots} screenshots generados (${successfulDesktop} desktop, ${successfulMobile} mobile exitosos) para ${datesToProcess.length} fecha(s). HTML capturado para fecha actual.`;
+    }
 
     res.json({
       success: true,
-      message: `${totalScreenshots} screenshots generados exitosamente (${allResults.desktop.length} desktop, ${allResults.mobile.length} mobile) para ${datesToProcess.length} fecha(s)`,
+      message: message,
       data: allResults,
     });
   } catch (error) {

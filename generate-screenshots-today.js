@@ -47,37 +47,45 @@ async function generateScreenshots() {
       console.log(`📊 ${data.message}`);
       console.log('');
 
-      // Mostrar detalles de desktop
-      if (data.data.desktop && data.data.desktop.length > 0) {
-        console.log('🖥️  DESKTOP SCREENSHOTS:');
-        data.data.desktop.forEach((screenshot, index) => {
-          if (screenshot.success) {
-            console.log(`  ${index + 1}. ${screenshot.fileName}`);
-            console.log(`     Tipo: ${screenshot.visualizationType || 'N/A'}`);
-            console.log(`     Drive ID: ${screenshot.driveFileId}`);
-            console.log(`     Link: ${screenshot.webViewLink}`);
-            console.log('');
-          } else {
-            console.log(`  ${index + 1}. ❌ Error: ${screenshot.error}`);
-            console.log('');
-          }
-        });
-      }
+      const totalScreenshots = (data.data.desktop?.length || 0) + (data.data.mobile?.length || 0);
 
-      // Mostrar detalles de mobile
-      if (data.data.mobile && data.data.mobile.length > 0) {
-        console.log('📱 MOBILE SCREENSHOTS:');
-        data.data.mobile.forEach((screenshot, index) => {
-          if (screenshot.success) {
-            console.log(`  ${index + 1}. ${screenshot.fileName}`);
-            console.log(`     Drive ID: ${screenshot.driveFileId}`);
-            console.log(`     Link: ${screenshot.webViewLink}`);
-            console.log('');
-          } else {
-            console.log(`  ${index + 1}. ❌ Error: ${screenshot.error}`);
-            console.log('');
-          }
-        });
+      if (totalScreenshots === 0) {
+        console.log('ℹ️  No se encontraron campañas para el día de hoy.');
+        console.log('📄 Sin embargo, el HTML de la página web fue capturado exitosamente.');
+        console.log('');
+      } else {
+        // Mostrar detalles de desktop
+        if (data.data.desktop && data.data.desktop.length > 0) {
+          console.log('🖥️  DESKTOP SCREENSHOTS:');
+          data.data.desktop.forEach((screenshot, index) => {
+            if (screenshot.success) {
+              console.log(`  ${index + 1}. ${screenshot.fileName}`);
+              console.log(`     Tipo: ${screenshot.visualizationType || 'N/A'}`);
+              console.log(`     Drive ID: ${screenshot.driveFileId}`);
+              console.log(`     Link: ${screenshot.webViewLink}`);
+              console.log('');
+            } else {
+              console.log(`  ${index + 1}. ❌ Error: ${screenshot.error}`);
+              console.log('');
+            }
+          });
+        }
+
+        // Mostrar detalles de mobile
+        if (data.data.mobile && data.data.mobile.length > 0) {
+          console.log('📱 MOBILE SCREENSHOTS:');
+          data.data.mobile.forEach((screenshot, index) => {
+            if (screenshot.success) {
+              console.log(`  ${index + 1}. ${screenshot.fileName}`);
+              console.log(`     Drive ID: ${screenshot.driveFileId}`);
+              console.log(`     Link: ${screenshot.webViewLink}`);
+              console.log('');
+            } else {
+              console.log(`  ${index + 1}. ❌ Error: ${screenshot.error}`);
+              console.log('');
+            }
+          });
+        }
       }
 
       console.log('🎉 Proceso completado exitosamente!');

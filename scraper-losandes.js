@@ -1611,15 +1611,16 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             'image/png'
         );
         console.log(`✅ Screenshot subido a ${storageMode} exitosamente!`);
+        console.log(`🔍 DEBUG - driveFile completo:`, JSON.stringify(driveFile, null, 2));
         console.log(`📁 ID: ${driveFile.id}`);
         console.log(`🔗 Link: ${driveFile.webViewLink}`);
 
-        return {
+        const result = {
             success: true,
             deviceType: deviceType,
             fileName: fileName,
-            driveId: driveFile.id,
-            driveLink: driveFile.webViewLink
+            driveFileId: driveFile.id,
+            webViewLink: driveFile.webViewLink
         };
         
         // Agregar tipo de visualización si está definido
