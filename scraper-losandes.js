@@ -1,32 +1,12 @@
-require('dotenv').config();
 const puppeteer = require('puppeteer');
-const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
-const streamifier = require('streamifier');
 const sharp = require('sharp');
 const { launchBrowser, configurePage, VIEWPORT_CONFIGS } = require('./puppeteer-config');
 const { getArgentinaDateTime, getArgentinaTimestamp } = require('./date-utils');
 const { navigateWithStrategies } = require('./navigation-strategies');
 const storageAdapter = require('./storage-adapter');
 
-/**
- * Autoriza y conecta con Google Drive API usando credenciales JWT
- * @returns {Promise<google.auth.JWT>} Cliente JWT autenticado
- * @throws {Error} Si las credenciales son inválidas o la autorización falla
- */
-async function authorize() {
-    const jwtClient = new google.auth.JWT(
-        process.env.GOOGLE_CLIENT_EMAIL,
-        null,
-        process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        ['https://www.googleapis.com/auth/drive']
-    );
-
-    await jwtClient.authorize();
-    console.log('✅ Successfully connected to Google Drive API.');
-    return jwtClient;
-}
 
 /**
  * Espera a que todas las imágenes de la página terminen de cargar
@@ -50,8 +30,7 @@ async function waitForAllImages(page, context = 'página') {
 }
 
 /**
- * Sube un buffer al almacenamiento (Google Drive o Local)
- * @param {google.drive|null} driveClient - Cliente de Google Drive autenticado (null si es modo local)
+ * Sube un buffer al almacenamiento local
  * @param {string} folderId - ID de la carpeta de destino
  * @param {string} fileName - Nombre del archivo a crear
  * @param {Buffer} buffer - Buffer con el contenido del archivo
@@ -59,11 +38,10 @@ async function waitForAllImages(page, context = 'página') {
  * @returns {Promise<Object>} Objeto con datos del archivo subido (id, name, webViewLink, webContentLink)
  * @throws {Error} Si falla la subida
  */
-async function uploadBufferToDrive(driveClient, folderId, fileName, buffer, mimeType) {
+async function uploadBuffer(folderId, fileName, buffer, mimeType) {
     try {
-        const result = await storageAdapter.uploadFile(folderId, fileName, buffer, mimeType, driveClient);
-        const storageMode = storageAdapter.isLocalMode() ? 'Local' : 'Google Drive';
-        console.log(`✅ File uploaded to ${storageMode}: ${fileName} (ID: ${result.id})`);
+        const result = await storageAdapter.uploadFile(folderId, fileName, buffer, mimeType);
+        console.log(`✅ File uploaded: ${fileName} (ID: ${result.id})`);
         return result;
     } catch (error) {
         console.error('❌ Error uploading file:', error.message);
@@ -74,7 +52,7 @@ async function uploadBufferToDrive(driveClient, folderId, fileName, buffer, mime
 /**
  * Función principal para capturar screenshots de Los Andes
  * @param {string} [deviceType='desktop'] - Tipo de dispositivo: 'desktop' o 'mobile'
- * @param {string} capturasFolderId - ID de la carpeta de Google Drive donde guardar el screenshot
+ * @param {string} capturasFolderId - ID de la carpeta donde guardar el screenshot
  * @param {string|null} [visualizationType=null] - Tipo de visualización: 'A', 'B', 'C', 'D' (desktop) o 'A', 'B', 'C' (mobile)
  * @param {Object|null} [jsonData=null] - Datos JSON con URLs de imágenes a insertar
  * @param {string} [jsonData.imagenLateral] - URL de imagen lateral
@@ -87,8 +65,8 @@ async function uploadBufferToDrive(driveClient, folderId, fileName, buffer, mime
  * @returns {boolean} return.success - Indica si la operación fue exitosa
  * @returns {string} return.deviceType - Tipo de dispositivo usado
  * @returns {string} return.fileName - Nombre del archivo generado
- * @returns {string} return.driveId - ID del archivo en Google Drive
- * @returns {string} return.driveLink - Link de visualización en Google Drive
+ * @returns {string} return.fileId - ID del archivo
+ * @returns {string} return.fileLink - Link del archivo
  * @throws {Error} Si falla el lanzamiento del navegador o la captura del screenshot
  * @example
  * // Screenshot actual sin imágenes
@@ -156,22 +134,15 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             console.log(`📂 Cargando HTML guardado para la fecha: ${targetDate}`);
             
             try {
-                const htmlFolderId = '1SWuk-zjLFg40weIaJ_oF3PbPgPDDTy49';
+                const htmlFolderId = 'html';
                 const fileName = `${targetDate}_${deviceType}.html`;
                 
                 console.log(`🔍 Buscando archivo: ${fileName}`);
                 
-                // Obtener driveClient si no es modo local
-                let driveClient = null;
-                if (!storageAdapter.isLocalMode()) {
-                    driveClient = google.drive({ version: 'v3', auth: await authorize() });
-                }
-                
                 // Buscar el archivo HTML usando el adaptador
                 const fileList = await storageAdapter.listFiles(
                     htmlFolderId,
-                    { name: fileName },
-                    driveClient
+                    { name: fileName }
                 );
                 
                 if (fileList.files.length === 0) {
@@ -183,7 +154,7 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 console.log(`✅ Archivo encontrado: ${fileName} (ID: ${fileId})`);
                 
                 // Leer el contenido del HTML usando el adaptador
-                const fileData = await storageAdapter.readFile(fileId, driveClient);
+                const fileData = await storageAdapter.readFile(fileId);
                 
                 let htmlContent = fileData.data;
                 if (Buffer.isBuffer(htmlContent)) {
@@ -1589,38 +1560,29 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         // fs.writeFileSync(localPath, finalScreenshot);
         // console.log(`✅ Screenshot guardado localmente: ${localPath}`);
 
-        // Subir al almacenamiento (Google Drive o Local)
-        const storageMode = storageAdapter.isLocalMode() ? 'almacenamiento local' : 'Google Drive';
-        console.log(`☁️  Subiendo a ${storageMode}...`);
-        
-        // Obtener driveClient solo si no es modo local
-        let driveClient = null;
-        if (!storageAdapter.isLocalMode()) {
-            const auth = await authorize();
-            driveClient = google.drive({ version: 'v3', auth });
-        }
+        // Subir al almacenamiento local
+        console.log(`☁️  Subiendo a almacenamiento local...`);
         
         // ID de la carpeta de capturas
-        const targetFolderId = capturasFolderId || "1pU3cEM7o0uzIvwSapmsF4YYX5lOiSYEs";
+        const targetFolderId = capturasFolderId || "capturas";
         
-        const driveFile = await uploadBufferToDrive(
-            driveClient,
+        const uploadedFile = await uploadBuffer(
             targetFolderId,
             fileName,
             finalScreenshot,
             'image/png'
         );
-        console.log(`✅ Screenshot subido a ${storageMode} exitosamente!`);
-        console.log(`🔍 DEBUG - driveFile completo:`, JSON.stringify(driveFile, null, 2));
-        console.log(`📁 ID: ${driveFile.id}`);
-        console.log(`🔗 Link: ${driveFile.webViewLink}`);
+        console.log(`✅ Screenshot subido exitosamente!`);
+        console.log(`🔍 DEBUG - uploadedFile completo:`, JSON.stringify(uploadedFile, null, 2));
+        console.log(`📁 ID: ${uploadedFile.id}`);
+        console.log(`🔗 Link: ${uploadedFile.webViewLink}`);
 
         const result = {
             success: true,
             deviceType: deviceType,
             fileName: fileName,
-            driveFileId: driveFile.id,
-            webViewLink: driveFile.webViewLink
+            fileId: uploadedFile.id,
+            webViewLink: uploadedFile.webViewLink
         };
         
         // Agregar tipo de visualización si está definido

@@ -3,11 +3,6 @@
  * Verifica que todas las operaciones funcionen correctamente
  */
 
-require('dotenv').config();
-
-// Forzar modo local para las pruebas
-process.env.CARPETAS_LOCALES = 'true';
-
 const storageAdapter = require('./storage-adapter');
 const fs = require('fs').promises;
 
@@ -27,11 +22,10 @@ async function runTests() {
     console.log('📋 Test 2: Subir archivo de prueba');
     const testBuffer = Buffer.from('Test content for local storage');
     const uploadResult = await storageAdapter.uploadFile(
-      '1bbkECY_axw5IttYjgVpRLmi6-EF80fZz', // imagenes_cargadas
+      'imagenes_cargadas',
       'test-file.txt',
       testBuffer,
-      'text/plain',
-      null
+      'text/plain'
     );
     console.log(`✅ Archivo subido: ${uploadResult.name}`);
     console.log(`✅ ID: ${uploadResult.id}\n`);
@@ -39,9 +33,8 @@ async function runTests() {
     // Test 3: Listar archivos
     console.log('📋 Test 3: Listar archivos');
     const filesResult = await storageAdapter.listFiles(
-      '1bbkECY_axw5IttYjgVpRLmi6-EF80fZz',
-      {},
-      null
+      'imagenes_cargadas',
+      {}
     );
     console.log(`✅ Archivos encontrados: ${filesResult.files.length}`);
     filesResult.files.forEach(file => {
@@ -51,26 +44,22 @@ async function runTests() {
     
     // Test 4: Leer archivo
     console.log('📋 Test 4: Leer archivo');
-    const readResult = await storageAdapter.readFile(uploadResult.id, null);
+    const readResult = await storageAdapter.readFile(uploadResult.id);
     const content = readResult.data.toString('utf8');
     console.log(`✅ Contenido leído: "${content}"\n`);
     
     // Test 5: Crear carpeta en navegacion
     console.log('📋 Test 5: Crear carpeta');
     const folderResult = await storageAdapter.createFolder(
-      '1norxhMEG62maIArwy-zjolxzPGsQoBzq', // navegacion raíz
-      'test-folder',
-      null
+      'root',
+      'test-folder'
     );
     console.log(`✅ Carpeta creada: ${folderResult.name}`);
     console.log(`✅ ID: ${folderResult.id}\n`);
     
     // Test 6: Listar carpetas
     console.log('📋 Test 6: Listar carpetas');
-    const foldersResult = await storageAdapter.listFolders(
-      '1norxhMEG62maIArwy-zjolxzPGsQoBzq',
-      null
-    );
+    const foldersResult = await storageAdapter.listFolders('root');
     console.log(`✅ Carpetas encontradas: ${foldersResult.folders.length}`);
     foldersResult.folders.forEach(folder => {
       console.log(`   - ${folder.name}`);
@@ -86,25 +75,23 @@ async function runTests() {
     };
     const jsonBuffer = Buffer.from(JSON.stringify(jsonData, null, 2));
     const jsonResult = await storageAdapter.uploadFile(
-      '1d40AKgKucYUY-CnSqcLd1v8uyXhElk33', // jsones
+      'jsones',
       'test-data.json',
       jsonBuffer,
-      'application/json',
-      null
+      'application/json'
     );
     console.log(`✅ JSON subido: ${jsonResult.name}\n`);
     
     // Test 8: Eliminar archivo
     console.log('📋 Test 8: Eliminar archivo');
-    await storageAdapter.deleteFile(uploadResult.id, null);
+    await storageAdapter.deleteFile(uploadResult.id);
     console.log(`✅ Archivo eliminado\n`);
     
     // Test 9: Verificar eliminación
     console.log('📋 Test 9: Verificar eliminación');
     const filesAfterDelete = await storageAdapter.listFiles(
-      '1bbkECY_axw5IttYjgVpRLmi6-EF80fZz',
-      {},
-      null
+      'imagenes_cargadas',
+      {}
     );
     console.log(`✅ Archivos restantes: ${filesAfterDelete.files.length}\n`);
     

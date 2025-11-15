@@ -1,11 +1,8 @@
-require("dotenv").config();
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const cors = require("cors");
-const { google } = require("googleapis");
-const streamifier = require("streamifier");
 const { scrapeLosAndes } = require("./scraper-losandes");
 const { launchBrowser, configurePage } = require("./puppeteer-config");
 const { getArgentinaDateString, getArgentinaISOString } = require("./date-utils");
@@ -15,75 +12,36 @@ const storageAdapter = require("./storage-adapter");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Google Drive folder IDs
-const imagenes = "1bbkECY_axw5IttYjgVpRLmi6-EF80fZz";
-const jsones = "1d40AKgKucYUY-CnSqcLd1v8uyXhElk33";
-const capturas = "1So5xiyo-X--XqPK3lh2zZJz7qYOJIGRR";
+// Carpetas de almacenamiento local
+const imagenes = "imagenes_cargadas";
+const jsones = "jsones";
+const capturas = "capturas";
+
+// Inicializar almacenamiento local
+storageAdapter.initializeStorage()
+  .then(() => {
+    const info = storageAdapter.getStorageInfo();
+    console.log("✅ Almacenamiento local inicializado");
+    console.log(`📁 Carpeta base: ${info.basePath}`);
+    console.log(`⚙️  Configuración: ${info.configPath}`);
+  })
+  .catch((err) => {
+    console.error("❌ Error inicializando almacenamiento local:", err);
+  });
 
 /**
- * Autoriza y conecta con Google Drive API usando credenciales JWT
- * @returns {Promise<google.auth.JWT>} Cliente JWT autenticado
- * @throws {Error} Si las credenciales son inválidas o la autorización falla
- */
-async function authorize() {
-  const jwtClient = new google.auth.JWT(
-    process.env.GOOGLE_CLIENT_EMAIL,
-    null,
-    process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-    ["https://www.googleapis.com/auth/drive"]
-  );
-
-  await jwtClient.authorize();
-  console.log("Successfully connected to Google Drive API.");
-  return jwtClient;
-}
-
-// Initialize storage (Google Drive or Local)
-let driveClient = null;
-
-// Initialize storage on startup
-if (storageAdapter.isLocalMode()) {
-  // Modo local
-  storageAdapter.initializeStorage()
-    .then(() => {
-      const info = storageAdapter.getStorageInfo();
-      console.log("✅ Almacenamiento local inicializado");
-      console.log(`📁 Carpeta base: ${info.basePath}`);
-      console.log(`⚙️  Configuración: ${info.configPath}`);
-    })
-    .catch((err) => {
-      console.error("❌ Error inicializando almacenamiento local:", err);
-    });
-} else {
-  // Modo Google Drive
-  if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-    authorize()
-      .then((auth) => {
-        driveClient = google.drive({ version: "v3", auth });
-        console.log("✅ Google Drive API initialized");
-      })
-      .catch((err) => {
-        console.error("❌ Error inicializando Google Drive:", err);
-      });
-  } else {
-    console.warn("⚠️  Google Drive credentials not found.");
-  }
-}
-
-/**
- * Sube un archivo al almacenamiento (Google Drive o Local)
+ * Sube un archivo al almacenamiento local
  * @param {string} folderId - ID de la carpeta de destino
  * @param {string} fileName - Nombre del archivo a crear
  * @param {Buffer} buffer - Buffer con el contenido del archivo
  * @param {string} mimeType - Tipo MIME del archivo (ej: 'image/png', 'application/json')
  * @returns {Promise<Object>} Objeto con datos del archivo subido (id, name, webViewLink, webContentLink)
- * @throws {Error} Si el almacenamiento no está inicializado o falla la subida
+ * @throws {Error} Si falla la subida
  */
-async function uploadFileToDrive(folderId, fileName, buffer, mimeType) {
+async function uploadFile(folderId, fileName, buffer, mimeType) {
   try {
-    const result = await storageAdapter.uploadFile(folderId, fileName, buffer, mimeType, driveClient);
-    const storageMode = storageAdapter.isLocalMode() ? 'Local' : 'Google Drive';
-    console.log(`✅ File uploaded to ${storageMode}: ${fileName} (ID: ${result.id})`);
+    const result = await storageAdapter.uploadFile(folderId, fileName, buffer, mimeType);
+    console.log(`✅ File uploaded: ${fileName} (ID: ${result.id})`);
     return result;
   } catch (error) {
     console.error("❌ Error uploading file:", error.message);
@@ -133,8 +91,7 @@ async function findJsonFileByName(folderId, fileName) {
   try {
     const result = await storageAdapter.listFiles(
       folderId,
-      { name: fileName },
-      driveClient
+      { name: fileName }
     );
 
     if (result.files.length > 0) {
@@ -154,7 +111,7 @@ async function findJsonFileByName(folderId, fileName) {
  */
 async function getJsonFileContent(fileId) {
   try {
-    const result = await storageAdapter.readFile(fileId, driveClient);
+    const result = await storageAdapter.readFile(fileId);
     
     // Si es un buffer, convertirlo a string y parsear
     let content = result.data;
@@ -176,12 +133,12 @@ async function getJsonFileContent(fileId) {
 }
 
 /**
- * Crea o actualiza un archivo JSON en el almacenamiento (Google Drive o Local)
+ * Crea o actualiza un archivo JSON en el almacenamiento local
  * @param {string} folderId - ID de la carpeta de destino
  * @param {string} fileName - Nombre del archivo JSON
  * @param {Object|Array} content - Contenido a guardar (será convertido a JSON)
  * @returns {Promise<Object>} Objeto con datos del archivo creado/actualizado
- * @throws {Error} Si el almacenamiento no está inicializado o falla la operación
+ * @throws {Error} Si falla la operación
  */
 async function createOrUpdateJsonFile(folderId, fileName, content) {
   const jsonContent = JSON.stringify(content, null, 2);
@@ -192,7 +149,7 @@ async function createOrUpdateJsonFile(folderId, fileName, content) {
 
   if (existingFile) {
     // Eliminar archivo existente
-    await storageAdapter.deleteFile(existingFile.id, driveClient);
+    await storageAdapter.deleteFile(existingFile.id);
   }
 
   // Crear nuevo archivo (más simple que actualizar)
@@ -200,8 +157,7 @@ async function createOrUpdateJsonFile(folderId, fileName, content) {
     folderId,
     fileName,
     buffer,
-    "application/json",
-    driveClient
+    "application/json"
   );
 
   return {
@@ -236,7 +192,7 @@ app.use("/screenshots", express.static("screenshots"));
 // ============================================================
 // IMPORTANTE: Los archivos NO se guardan en disco local.
 // Se almacenan temporalmente en memoria (RAM) y se suben
-// directamente a Google Drive. Después se liberan de memoria.
+// al almacenamiento local. Después se liberan de memoria.
 // ============================================================
 
 const storage = multer.memoryStorage(); // Almacenamiento en memoria (NO en disco)
@@ -291,7 +247,7 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     argentinaDate: argentinaDate,
     uptime: process.uptime(),
-    drive: driveClient ? "connected" : "disconnected",
+    storage: "local",
   });
 });
 
@@ -323,17 +279,9 @@ app.post("/upload", async (req, res) => {
       });
     }
 
-    // Verificar que el almacenamiento esté configurado
-    if (!storageAdapter.isLocalMode() && !driveClient) {
-      return res.status(500).json({
-        success: false,
-        error: "Almacenamiento no está configurado",
-      });
-    }
-
-    // Obtener información de los archivos subidos y subirlos a Google Drive
+    // Obtener información de los archivos subidos y subirlos al almacenamiento local
     const uploadedFiles = {};
-    const driveUploadPromises = [];
+    const uploadPromises = [];
 
     for (const fieldName in req.files) {
       if (req.files[fieldName] && req.files[fieldName][0]) {
@@ -344,32 +292,32 @@ app.post("/upload", async (req, res) => {
           mimetype: file.mimetype,
         };
 
-        // Subir el archivo a Google Drive
-        const drivePromise = uploadFileToDrive(
+        // Subir el archivo al almacenamiento local
+        const uploadPromise = uploadFile(
           imagenes,
           file.originalname,
           file.buffer,
           file.mimetype
         )
-          .then((driveFile) => {
-            uploadedFiles[fieldName].driveId = driveFile.id;
-            uploadedFiles[fieldName].driveLink = driveFile.webViewLink;
-            uploadedFiles[fieldName].driveContentLink =
-              driveFile.webContentLink;
+          .then((uploadedFile) => {
+            uploadedFiles[fieldName].fileId = uploadedFile.id;
+            uploadedFiles[fieldName].fileLink = uploadedFile.webViewLink;
+            uploadedFiles[fieldName].fileContentLink =
+              uploadedFile.webContentLink;
           })
           .catch((err) => {
             console.error(
-              `Error al subir ${file.originalname} a Drive:`,
+              `Error al subir ${file.originalname}:`,
               err.message
             );
-            uploadedFiles[fieldName].driveError = err.message;
+            uploadedFiles[fieldName].uploadError = err.message;
           });
-        driveUploadPromises.push(drivePromise);
+        uploadPromises.push(uploadPromise);
       }
     }
 
-    // Esperar a que todos los archivos se suban a Drive
-    await Promise.all(driveUploadPromises);
+    // Esperar a que todos los archivos se suban
+    await Promise.all(uploadPromises);
 
     // Obtener el tipo de dispositivo del body
     const deviceType = req.body.deviceType || "desktop";
@@ -419,19 +367,19 @@ app.post("/upload", async (req, res) => {
           // Crear objeto con la información de las imágenes
           const imageData = {
             imagenLateral: uploadedFiles.imagenLateral
-              ? `/image/${uploadedFiles.imagenLateral.driveId}`
+              ? `/image/${uploadedFiles.imagenLateral.fileId}`
               : null,
             imagenAncho: uploadedFiles.imagenAncho
-              ? `/image/${uploadedFiles.imagenAncho.driveId}`
+              ? `/image/${uploadedFiles.imagenAncho.fileId}`
               : null,
             imagenTop: uploadedFiles.imagenTop
-              ? `/image/${uploadedFiles.imagenTop.driveId}`
+              ? `/image/${uploadedFiles.imagenTop.fileId}`
               : null,
             itt: uploadedFiles.itt
-              ? `/image/${uploadedFiles.itt.driveId}`
+              ? `/image/${uploadedFiles.itt.fileId}`
               : null,
             zocalo: uploadedFiles.zocalo
-              ? `/image/${uploadedFiles.zocalo.driveId}`
+              ? `/image/${uploadedFiles.zocalo.fileId}`
               : null,
             deviceType: deviceType,
             campaignDate: getArgentinaISOString(date), // Fecha de la campaña (día seleccionado)
@@ -501,19 +449,19 @@ app.post("/upload", async (req, res) => {
           // Crear objeto con la información de las imágenes
           const imageData = {
             imagenLateral: uploadedFiles.imagenLateral
-              ? `/image/${uploadedFiles.imagenLateral.driveId}`
+              ? `/image/${uploadedFiles.imagenLateral.fileId}`
               : null,
             imagenAncho: uploadedFiles.imagenAncho
-              ? `/image/${uploadedFiles.imagenAncho.driveId}`
+              ? `/image/${uploadedFiles.imagenAncho.fileId}`
               : null,
             imagenTop: uploadedFiles.imagenTop
-              ? `/image/${uploadedFiles.imagenTop.driveId}`
+              ? `/image/${uploadedFiles.imagenTop.fileId}`
               : null,
             itt: uploadedFiles.itt
-              ? `/image/${uploadedFiles.itt.driveId}`
+              ? `/image/${uploadedFiles.itt.fileId}`
               : null,
             zocalo: uploadedFiles.zocalo
-              ? `/image/${uploadedFiles.zocalo.driveId}`
+              ? `/image/${uploadedFiles.zocalo.fileId}`
               : null,
             deviceType: deviceType,
             campaignDate: getArgentinaISOString(date), // Fecha de la campaña (día seleccionado)
@@ -568,7 +516,7 @@ app.post("/upload", async (req, res) => {
     // Responder con éxito
     res.json({
       success: true,
-      message: "Imágenes subidas a Google Drive correctamente",
+      message: "Imágenes subidas correctamente",
       deviceType: deviceType,
       files: uploadedFiles,
       jsonFiles: jsonResults,
@@ -577,50 +525,12 @@ app.post("/upload", async (req, res) => {
   });
 });
 
-// Endpoint para listar archivos de Google Drive
-app.get("/uploads", async (req, res) => {
-  if (!driveClient) {
-    return res.status(500).json({
-      success: false,
-      error: "Google Drive no está configurado",
-    });
-  }
-
-  try {
-    const response = await driveClient.files.list({
-      q: `'${imagenes}' in parents and trashed=false and mimeType contains 'image/'`,
-      fields:
-        "files(id, name, size, createdTime, webViewLink, webContentLink, thumbnailLink, mimeType)",
-      orderBy: "createdTime desc",
-      pageSize: 100,
-    });
-
-    res.json({
-      success: true,
-      files: response.data.files,
-    });
-  } catch (error) {
-    console.error("Error al listar archivos de Drive:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Error al obtener archivos de Google Drive",
-    });
-  }
-});
-
-// Endpoint para listar carpetas (Google Drive o Local)
+// Endpoint para listar carpetas
 app.get("/folders", async (req, res) => {
-  if (!storageAdapter.isLocalMode() && !driveClient) {
-    return res.status(500).json({
-      success: false,
-      error: "Almacenamiento no está configurado",
-    });
-  }
-
   try {
-    const parentId = req.query.parentId || "1norxhMEG62maIArwy-zjolxzPGsQoBzq"; // Carpeta raíz por defecto
+    const parentId = req.query.parentId || "root"; // Carpeta raíz por defecto
 
-    const result = await storageAdapter.listFolders(parentId, driveClient);
+    const result = await storageAdapter.listFolders(parentId);
 
     console.log(`📊 Carpetas encontradas antes de filtrar: ${result.folders.length}`);
     result.folders.forEach(f => console.log(`  - ${f.name} (ID: ${f.id})`));
@@ -660,17 +570,10 @@ app.get("/folders", async (req, res) => {
 
 // Endpoint para obtener información de una carpeta específica
 app.get("/folder-info/:folderId", async (req, res) => {
-  if (!storageAdapter.isLocalMode() && !driveClient) {
-    return res.status(500).json({
-      success: false,
-      error: "Almacenamiento no está configurado",
-    });
-  }
-
   try {
     const folderId = req.params.folderId;
 
-    const folderInfo = await storageAdapter.getFolderInfo(folderId, driveClient);
+    const folderInfo = await storageAdapter.getFolderInfo(folderId);
 
     res.json({
       success: true,
@@ -687,15 +590,8 @@ app.get("/folder-info/:folderId", async (req, res) => {
 
 // Endpoint para listar archivos JSON
 app.get("/json-files", async (req, res) => {
-  if (!storageAdapter.isLocalMode() && !driveClient) {
-    return res.status(500).json({
-      success: false,
-      error: "Almacenamiento no está configurado",
-    });
-  }
-
   try {
-    const result = await storageAdapter.listFiles(jsones, { mimeType: 'application/json' }, driveClient);
+    const result = await storageAdapter.listFiles(jsones, { mimeType: 'application/json' });
 
     res.json({
       success: true,
@@ -712,13 +608,6 @@ app.get("/json-files", async (req, res) => {
 
 // Endpoint para obtener contenido de un archivo JSON específico
 app.get("/json-file/:fileId", async (req, res) => {
-  if (!storageAdapter.isLocalMode() && !driveClient) {
-    return res.status(500).json({
-      success: false,
-      error: "Almacenamiento no está configurado",
-    });
-  }
-
   const fileId = req.params.fileId;
 
   try {
@@ -736,52 +625,25 @@ app.get("/json-file/:fileId", async (req, res) => {
   }
 });
 
-// Endpoint para servir imágenes (Google Drive o Local)
+// Endpoint para servir imágenes
 app.get("/image/:fileId", async (req, res) => {
-  if (!storageAdapter.isLocalMode() && !driveClient) {
-    return res.status(500).json({
-      success: false,
-      error: "Almacenamiento no está configurado",
-    });
-  }
-
   const fileId = req.params.fileId;
 
   try {
-    if (storageAdapter.isLocalMode()) {
-      // Modo local: leer archivo del almacenamiento local
-      const fileData = await storageAdapter.readFile(fileId, null);
-      
-      // Establecer headers apropiados
-      res.setHeader(
-        "Content-Type",
-        fileData.metadata.mimeType || "image/png"
-      );
-      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache por 24 horas
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("ngrok-skip-browser-warning", "true");
-      
-      // Enviar el buffer
-      res.send(fileData.data);
-    } else {
-      // Modo Google Drive: hacer proxy del stream
-      const response = await driveClient.files.get(
-        { fileId: fileId, alt: "media" },
-        { responseType: "stream" }
-      );
-
-      // Establecer headers apropiados para ngrok y CORS
-      res.setHeader(
-        "Content-Type",
-        response.headers["content-type"] || "image/png"
-      );
-      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache por 24 horas
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("ngrok-skip-browser-warning", "true");
-
-      // Pipe el stream de Drive a la respuesta
-      response.data.pipe(res);
-    }
+    // Leer archivo del almacenamiento local
+    const fileData = await storageAdapter.readFile(fileId);
+    
+    // Establecer headers apropiados
+    res.setHeader(
+      "Content-Type",
+      fileData.metadata.mimeType || "image/png"
+    );
+    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache por 24 horas
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("ngrok-skip-browser-warning", "true");
+    
+    // Enviar el buffer
+    res.send(fileData.data);
   } catch (error) {
     console.error(
       `Error al obtener imagen (${fileId}):`,
@@ -800,17 +662,10 @@ app.get("/image/:fileId", async (req, res) => {
 
 // Endpoint para servir archivos locales
 app.get("/local-files/:fileId", async (req, res) => {
-  if (!storageAdapter.isLocalMode()) {
-    return res.status(404).json({
-      success: false,
-      error: "Este endpoint solo funciona en modo local",
-    });
-  }
-
   const fileId = req.params.fileId;
 
   try {
-    const fileData = await storageAdapter.readFile(fileId, null);
+    const fileData = await storageAdapter.readFile(fileId);
     
     console.log(`📥 Sirviendo archivo local: ${fileData.metadata.name} (${fileData.metadata.size} bytes)`);
     

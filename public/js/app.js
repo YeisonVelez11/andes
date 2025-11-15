@@ -81,7 +81,7 @@ let isSubmitting = false; // Bandera para prevenir múltiples submits
 
 // Variables para el selector de carpetas
 let folderNavigationStack = [];
-let currentFolderId = '1norxhMEG62maIArwy-zjolxzPGsQoBzq'; // Carpeta raíz
+let currentFolderId = 'root'; // Carpeta raíz
 let selectedFolderId = null;
 let selectedFolderName = null;
 
@@ -1292,29 +1292,20 @@ if (generateScreenshotBtn) {
             const deviceLabel = screenshot.deviceType ? ` (${screenshot.deviceType})` : '';
             const dateLabel = screenshot.date ? ` - ${screenshot.date}` : '';
             
-            // Detectar si es modo local (link empieza con /local-files/)
-            const isLocalMode = (screenshot.webViewLink || screenshot.driveLink || '').startsWith('/local-files/');
-            const storageLabel = isLocalMode ? 'Almacenamiento Local' : 'Google Drive';
             const fileLink = screenshot.webViewLink || screenshot.driveLink;
             
             html += `
               <div style="margin-bottom: 20px; ${index > 0 ? 'padding-top: 15px; border-top: 1px solid #ddd;' : ''}">
-                <h6 class="purple-text">Screenshot ${index + 1}${visualizationLabel}${deviceLabel}${dateLabel}</h6>
-                <p><strong>Archivo:</strong> ${screenshot.fileName}</p>
-                <p><strong>ID:</strong> <code>${screenshot.driveFileId || screenshot.driveId}</code></p>
-                <p><strong>Almacenamiento:</strong> ${storageLabel}</p>
-                <div class="center-align" style="margin-top: 10px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                  ${isLocalMode ? `
-                    <a href="${fileLink}" download="${screenshot.fileName}" class="btn waves-effect waves-light green">
-                      <i class="material-icons left">download</i>
-                      Descargar
-                    </a>
-                  ` : `
-                    <a href="${fileLink}" target="_blank" class="btn waves-effect waves-light purple darken-2">
-                      <i class="material-icons left">open_in_new</i>
-                      Ver en Google Drive
-                    </a>
-                  `}
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <strong>${screenshot.campana || 'Sin campaña'}${dateLabel}</strong>
+                    <br>
+                    <small style="color: #666;">Almacenamiento Local</small>
+                  </div>
+                  <a href="${fileLink}" download class="btn waves-effect waves-light green">
+                    <i class="material-icons left">download</i>
+                    Descargar
+                  </a>
                 </div>
               </div>
             `;
@@ -1372,7 +1363,7 @@ if (generateScreenshotBtn) {
 // FUNCIONES PARA SELECTOR DE CARPETAS
 // ============================================================
 
-// Cargar carpetas de Google Drive
+// Cargar carpetas del almacenamiento local
 async function loadFolders(parentId) {
   const folderList = document.getElementById('folderList');
   const breadcrumb = document.getElementById('folderBreadcrumb');
@@ -1468,7 +1459,7 @@ function selectFolder(folderId, folderName) {
 function updateBreadcrumb() {
   const breadcrumb = document.getElementById('folderBreadcrumb');
   
-  let html = '<i class="material-icons tiny" style="vertical-align: middle; cursor: pointer;" onclick="loadFolders(\'1norxhMEG62maIArwy-zjolxzPGsQoBzq\'); folderNavigationStack = [];">home</i>';
+  let html = '<i class="material-icons tiny" style="vertical-align: middle; cursor: pointer;" onclick="loadFolders(\'root\'); folderNavigationStack = [];">home</i>';
   
   if (folderNavigationStack.length > 0) {
     html += ' <span class="grey-text">/</span> ';

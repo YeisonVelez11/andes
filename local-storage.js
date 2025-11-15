@@ -1,6 +1,6 @@
 /**
- * Sistema de almacenamiento local simplificado
- * Usa nombres de carpetas directamente, sin IDs hash
+ * Sistema de almacenamiento local
+ * Gestiona archivos y carpetas en el sistema de archivos local
  */
 
 const fs = require('fs').promises;
@@ -12,23 +12,20 @@ const crypto = require('crypto');
 const BASE_DIR = path.join(__dirname, 'navegacion');
 const CONFIG_DIR = path.join(__dirname, 'config_local');
 
-// Mapeo de IDs de Google Drive a rutas locales
+// Mapeo de IDs especiales a rutas locales
 const FOLDER_ID_MAP = {
-  // Carpetas de configuración (config_local)
-  '1bbkECY_axw5IttYjgVpRLmi6-EF80fZz': path.join(CONFIG_DIR, 'imagenes_cargadas'),
-  '1d40AKgKucYUY-CnSqcLd1v8uyXhElk33': path.join(CONFIG_DIR, 'jsones'),
-  '1SWuk-zjLFg40weIaJ_oF3PbPgPDDTy49': path.join(CONFIG_DIR, 'html'),
-  '1So5xiyo-X--XqPK3lh2zZJz7qYOJIGRR': path.join(CONFIG_DIR, 'capturas'),
-  
-  // Carpeta raíz de navegación
-  '1norxhMEG62maIArwy-zjolxzPGsQoBzq': BASE_DIR
+  'imagenes_cargadas': path.join(CONFIG_DIR, 'imagenes_cargadas'),
+  'jsones': path.join(CONFIG_DIR, 'jsones'),
+  'html': path.join(CONFIG_DIR, 'html'),
+  'capturas': path.join(CONFIG_DIR, 'capturas'),
+  'root': BASE_DIR
 };
 
 /**
  * Convierte un folderId (nombre o path) a ruta absoluta
  */
 function folderIdToPath(folderId, parentPath = BASE_DIR) {
-  // Si es un ID conocido de Drive, usar el mapeo
+  // Si es un ID especial, usar el mapeo
   if (FOLDER_ID_MAP[folderId]) {
     return FOLDER_ID_MAP[folderId];
   }
@@ -46,7 +43,7 @@ function folderIdToPath(folderId, parentPath = BASE_DIR) {
  * Convierte una ruta a un folderId (nombre de carpeta)
  */
 function pathToFolderId(folderPath) {
-  // Verificar si es una carpeta conocida de Drive
+  // Verificar si es una carpeta especial
   for (const [id, mappedPath] of Object.entries(FOLDER_ID_MAP)) {
     if (folderPath === mappedPath) {
       return id;
@@ -56,7 +53,7 @@ function pathToFolderId(folderPath) {
   // Para carpetas dinámicas, usar la ruta relativa desde BASE_DIR
   if (folderPath.startsWith(BASE_DIR)) {
     const relativePath = path.relative(BASE_DIR, folderPath);
-    return relativePath || '1norxhMEG62maIArwy-zjolxzPGsQoBzq'; // Si es BASE_DIR, retornar el ID raíz
+    return relativePath || 'root';
   }
   
   // Para otras carpetas, usar la ruta completa
@@ -277,7 +274,7 @@ async function listFoldersInLocal(parentId) {
         folders.push({
           id: folderId,
           name: item.name,
-          mimeType: 'application/vnd.google-apps.folder',
+          mimeType: 'folder',
           createdTime: stats.birthtime.toISOString(),
           modifiedTime: stats.mtime.toISOString(),
           webViewLink: `file://${folderPath}`
@@ -317,7 +314,7 @@ async function createFolderInLocal(parentId, folderName) {
     return {
       id: folderId,
       name: folderName,
-      mimeType: 'application/vnd.google-apps.folder',
+      mimeType: 'folder',
       createdTime: stats.birthtime.toISOString(),
       webViewLink: `file://${folderPath}`
     };
@@ -418,7 +415,7 @@ async function getFolderInfo(folderId) {
       id: folderId,
       name: folderName,
       parents: parentId ? [parentId] : [],
-      mimeType: 'application/vnd.google-apps.folder',
+      mimeType: 'folder',
       createdTime: stats.birthtime.toISOString()
     };
   } catch (error) {
