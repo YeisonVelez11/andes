@@ -731,14 +731,14 @@ async function scrapeLosAndesWithRetry(deviceType, targetFolderId, visualization
 }
 
 /**
- * Captura el HTML de Los Andes (desktop y mobile) y lo guarda en Google Drive
+ * Captura el HTML de Los Andes (desktop y mobile) y lo guarda en almacenamiento local
  * Usa la fecha actual de Argentina para nombrar los archivos
  * Si el archivo ya existe, lo actualiza; si no, lo crea
  * @returns {Promise<void>}
  * @throws {Error} Si falla el lanzamiento del navegador o la captura del HTML
  */
 async function captureAndSaveHTML() {
-  const htmlFolderId = "1SWuk-zjLFg40weIaJ_oF3PbPgPDDTy49";
+  const htmlFolderId = "html";
   const url = "https://www.losandes.com.ar/";
   const today = getArgentinaDateString(); // YYYY-MM-DD
   
@@ -812,8 +812,7 @@ async function captureAndSaveHTML() {
       console.log(`🔍 Buscando archivo existente: ${fileName}...`);
       const existingFiles = await storageAdapter.listFiles(
         htmlFolderId,
-        { name: fileName },
-        driveClient
+        { name: fileName }
       );
 
       if (existingFiles.files.length > 0) {
@@ -822,7 +821,7 @@ async function captureAndSaveHTML() {
         console.log(
           `📝 Archivo existente encontrado (ID: ${fileId}), eliminando...`
         );
-        await storageAdapter.deleteFile(fileId, driveClient);
+        await storageAdapter.deleteFile(fileId);
       }
 
       // Crear nuevo archivo usando el adaptador
@@ -831,8 +830,7 @@ async function captureAndSaveHTML() {
         htmlFolderId,
         fileName,
         htmlBuffer,
-        "text/html",
-        driveClient
+        "text/html"
       );
       const storageMode = storageAdapter.isLocalMode() ? 'Local' : 'Google Drive';
       console.log(`✅ HTML ${deviceType} guardado en ${storageMode}: ${fileName}`);
