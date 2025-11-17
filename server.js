@@ -837,6 +837,7 @@ async function captureAndSaveHTML() {
       results[deviceType] = true;
     } catch (error) {
       console.error(`❌ Error capturando HTML ${deviceType}:`, error.message);
+      console.error(`❌ Stack trace:`, error.stack);
       console.log(`⚠️ Continuando con el siguiente dispositivo...`);
       results[deviceType] = false;
     } finally {
@@ -845,6 +846,12 @@ async function captureAndSaveHTML() {
         await browser.close();
         console.log("✅ Navegador cerrado");
       }
+    }
+    
+    // Esperar un poco entre desktop y mobile para liberar recursos
+    if (deviceType === 'desktop') {
+      console.log("⏳ Esperando 5 segundos antes de capturar mobile...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
   
