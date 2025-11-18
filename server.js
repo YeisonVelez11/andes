@@ -814,6 +814,7 @@ async function captureAndSaveHTML() {
         htmlFolderId,
         { name: fileName }
       );
+      console.log(`✅ Búsqueda completada: ${existingFiles.files.length} archivo(s) encontrado(s)`);
 
       if (existingFiles.files.length > 0) {
         // Eliminar archivo existente y crear uno nuevo (más simple que actualizar)
@@ -822,16 +823,20 @@ async function captureAndSaveHTML() {
           `📝 Archivo existente encontrado (ID: ${fileId}), eliminando...`
         );
         await storageAdapter.deleteFile(fileId);
+        console.log(`✅ Archivo anterior eliminado`);
+      } else {
+        console.log(`ℹ️ No hay archivo anterior, se creará uno nuevo`);
       }
 
       // Crear nuevo archivo usando el adaptador
-      console.log("📝 Creando archivo HTML...");
+      console.log(`📝 Creando archivo HTML (${htmlBuffer.length} bytes)...`);
       const result = await storageAdapter.uploadFile(
         htmlFolderId,
         fileName,
         htmlBuffer,
         "text/html"
       );
+      console.log(`✅ Archivo creado con ID: ${result.id}`);
       const storageMode = storageAdapter.isLocalMode() ? 'Local' : 'Google Drive';
       console.log(`✅ HTML ${deviceType} guardado en ${storageMode}: ${fileName}`);
       results[deviceType] = true;
