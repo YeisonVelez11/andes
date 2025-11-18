@@ -79,7 +79,9 @@ async function findFileByIdRecursive(fileId, searchPath) {
       
       if (item.isFile()) {
         const itemId = generateFileId(fullPath);
+        // console.log(`🔍 Comparando: ${itemId} === ${fileId} (${item.name})`);
         if (itemId === fileId) {
+          console.log(`✅ Archivo encontrado: ${fullPath}`);
           return fullPath;
         }
       } else if (item.isDirectory()) {
@@ -89,7 +91,8 @@ async function findFileByIdRecursive(fileId, searchPath) {
       }
     }
   } catch (error) {
-    // Ignorar errores de permisos
+    // Ignorar errores de permisos o carpetas que no existen
+    console.log(`⚠️ Error buscando en ${searchPath}:`, error.message);
   }
   
   return null;

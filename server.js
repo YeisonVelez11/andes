@@ -628,10 +628,12 @@ app.get("/json-file/:fileId", async (req, res) => {
 // Endpoint para servir imágenes
 app.get("/image/:fileId", async (req, res) => {
   const fileId = req.params.fileId;
+  console.log(`🖼️ Solicitud de imagen: ${fileId}`);
 
   try {
     // Leer archivo del almacenamiento local
     const fileData = await storageAdapter.readFile(fileId);
+    console.log(`✅ Imagen encontrada: ${fileData.metadata.name} (${fileData.metadata.size} bytes)`);
     
     // Establecer headers apropiados
     res.setHeader(
@@ -646,9 +648,10 @@ app.get("/image/:fileId", async (req, res) => {
     res.send(fileData.data);
   } catch (error) {
     console.error(
-      `Error al obtener imagen (${fileId}):`,
+      `❌ Error al obtener imagen (${fileId}):`,
       error.message
     );
+    console.error(`❌ Stack:`, error.stack);
     // Enviar una imagen transparente 1x1 en caso de error
     const transparentPixel = Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
