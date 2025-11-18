@@ -848,8 +848,27 @@ async function captureAndSaveHTML() {
     } finally {
       if (browser) {
         console.log("🔒 Cerrando navegador...");
-        await browser.close();
-        console.log("✅ Navegador cerrado");
+        try {
+          // Intentar cerrar con timeout de 10 segundos
+          await Promise.race([
+            browser.close(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout cerrando navegador')), 10000)
+            )
+          ]);
+          console.log("✅ Navegador cerrado");
+        } catch (closeError) {
+          console.log("⚠️ Error cerrando navegador:", closeError.message);
+          console.log("🔪 Intentando matar proceso de Chrome...");
+          try {
+            // Forzar cierre del proceso
+            const pages = await browser.pages();
+            await Promise.all(pages.map(page => page.close().catch(() => {})));
+            await browser.close().catch(() => {});
+          } catch (e) {
+            console.log("⚠️ No se pudo cerrar limpiamente, continuando...");
+          }
+        }
       }
     }
     
