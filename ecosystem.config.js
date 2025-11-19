@@ -27,14 +27,14 @@ module.exports = {
       out_file: './logs/server-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      // Configuración de reinicio más conservadora
-      max_restarts: 5,
-      min_uptime: '5s',
-      restart_delay: 3000, // Esperar 3 segundos entre reinicios
-      kill_timeout: 5000, // Esperar 5 segundos antes de forzar kill
-      listen_timeout: 10000, // Esperar 10 segundos para que el servidor escuche
-      // No reiniciar si hay error de puerto ocupado
-      exp_backoff_restart_delay: 100
+      // Configuración de reinicio MUY conservadora para evitar conflictos de puerto
+      max_restarts: 3,
+      min_uptime: '10s',
+      restart_delay: 10000, // Esperar 10 segundos entre reinicios
+      kill_timeout: 10000, // Esperar 10 segundos antes de forzar kill
+      listen_timeout: 30000, // Esperar 30 segundos para que el servidor escuche
+      wait_ready: false, // No esperar señal ready
+      autorestart: false // DESACTIVAR auto-reinicio para debug
     }
   ]
 };

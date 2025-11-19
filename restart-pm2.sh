@@ -10,7 +10,8 @@ echo "1️⃣ Deteniendo PM2..."
 pm2 delete all 2>/dev/null || true
 pm2 kill
 
-sleep 2
+echo "   Esperando 5 segundos para que todo cierre..."
+sleep 5
 
 # 2. Matar cualquier proceso en puerto 3000
 echo "2️⃣ Liberando puerto 3000..."
