@@ -700,6 +700,51 @@ app.get("/local-files/:fileId", async (req, res) => {
 
 
 /**
+ * Convierte URLs de imágenes locales a rutas de archivo para uso en Puppeteer
+ * @param {Object} jsonData - Datos JSON con URLs de imágenes
+ * @returns {Promise<Object>} Objeto con las mismas claves pero valores como file:// URLs
+ */
+async function convertImagesToFilePaths(jsonData) {
+  if (!jsonData) return null;
+  
+  const result = {};
+  const imageKeys = ['imagenLateral', 'imagenAncho', 'imagenTop', 'itt', 'zocalo'];
+  
+  for (const key of imageKeys) {
+    if (jsonData[key]) {
+      try {
+        // Extraer el fileId de la URL /image/:fileId
+        const match = jsonData[key].match(/\/image\/([a-f0-9]+)/);
+        if (match) {
+          const fileId = match[1];
+          console.log(`🔄 Resolviendo ruta de ${key} (${fileId})...`);
+          
+          // Buscar el archivo en el sistema
+          const filePath = await storageAdapter.findFileById(fileId);
+          
+          if (filePath) {
+            // Convertir a file:// URL para Puppeteer
+            result[key] = `file://${filePath}`;
+            console.log(`✅ ${key} → ${filePath}`);
+          } else {
+            console.error(`❌ Archivo no encontrado para ${key} (${fileId})`);
+            result[key] = jsonData[key];
+          }
+        } else {
+          // Si no es una URL local, mantener la original
+          result[key] = jsonData[key];
+        }
+      } catch (error) {
+        console.error(`❌ Error resolviendo ${key}:`, error.message);
+        result[key] = jsonData[key];
+      }
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Ejecuta scrapeLosAndes con reintentos agresivos y múltiples estrategias
  * @param {string} deviceType - Tipo de dispositivo
  * @param {string} targetFolderId - ID de carpeta destino
@@ -710,12 +755,15 @@ app.get("/local-files/:fileId", async (req, res) => {
  * @returns {Promise<Object>} Resultado del scraping
  */
 async function scrapeLosAndesWithRetry(deviceType, targetFolderId, visualizationType, jsonData, targetDate, maxRetries = 5) {
+  // Convertir URLs de imágenes a rutas de archivo para que Puppeteer pueda cargarlas
+  const jsonDataWithFilePaths = await convertImagesToFilePaths(jsonData);
+  
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`🔄 Intento ${attempt}/${maxRetries} para screenshot ${deviceType}`);
       
-      // Llamar a scrapeLosAndes - las estrategias se manejan dentro de scraper-losandes.js
-      const result = await scrapeLosAndes(deviceType, targetFolderId, visualizationType, jsonData, targetDate, attempt, maxRetries);
+      // Llamar a scrapeLosAndes con las rutas de archivo
+      const result = await scrapeLosAndes(deviceType, targetFolderId, visualizationType, jsonDataWithFilePaths, targetDate, attempt, maxRetries);
       console.log(`✅ Screenshot ${deviceType} exitoso en intento ${attempt}`);
       return result;
     } catch (error) {
@@ -1011,6 +1059,16 @@ app.post("/generate-screenshot", async (req, res) => {
         const visualizationType = record.tipo_visualizacion || "A";
         const targetFolderId = record.carpeta_id || capturas;
         const targetFolderName = record.carpeta_nombre || "capturas (default)";
+        
+        // Formatear fecha de creación de la campaña
+        const uploadedAt = record.uploadedAt ? new Date(record.uploadedAt).toLocaleString('es-AR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }) : dateToProcess;
 
         console.log(
           `\n🎬 Generando screenshot DESKTOP ${i + 1}/${
@@ -1061,6 +1119,7 @@ app.post("/generate-screenshot", async (req, res) => {
             recordIndex: i,
             date: dateToProcess,
             deviceType: "desktop",
+            campana: `${targetFolderName}-desktop-${visualizationType} (${uploadedAt})`,
           });
         } catch (error) {
           console.error(
@@ -1126,6 +1185,16 @@ app.post("/generate-screenshot", async (req, res) => {
         const record = mobileRecords[i];
         const targetFolderId = record.carpeta_id || capturas;
         const targetFolderName = record.carpeta_nombre || "capturas (default)";
+        
+        // Formatear fecha de creación de la campaña
+        const uploadedAt = record.uploadedAt ? new Date(record.uploadedAt).toLocaleString('es-AR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }) : dateToProcess;
 
         console.log(
           `\n🎬 Generando screenshot MOBILE ${i + 1}/${mobileRecords.length}`
@@ -1176,6 +1245,7 @@ app.post("/generate-screenshot", async (req, res) => {
             recordIndex: i,
             date: dateToProcess,
             deviceType: "mobile",
+            campana: visualizationType ? `${targetFolderName}-mobile-${visualizationType} (${uploadedAt})` : `${targetFolderName}-mobile (${uploadedAt})`,
           });
         } catch (error) {
           console.error(
