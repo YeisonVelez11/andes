@@ -1360,9 +1360,44 @@ app.use((err, req, res, next) => {
 });
 
 // Iniciar servidor
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`☁️  Almacenamiento: Google Drive (Carpeta ID: ${imagenes})`);
+  console.log(`💾 Almacenamiento: LOCAL (Sistema de archivos)`);
   console.log(`🌎 Zona horaria: America/Argentina/Buenos_Aires (UTC-3)`);
   console.log(`📅 Fecha actual (Argentina): ${getArgentinaDateString()}`);
+});
+
+// Manejar errores de puerto ocupado
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Error: El puerto ${PORT} ya está en uso`);
+    console.error('');
+    console.error('💡 Soluciones:');
+    console.error('   1. Detener el proceso que usa el puerto:');
+    console.error(`      lsof -ti:${PORT} | xargs kill -9`);
+    console.error('');
+    console.error('   2. Reiniciar PM2:');
+    console.error('      pm2 restart andes-server');
+    process.exit(1);
+  } else {
+    console.error('❌ Error al iniciar servidor:', err);
+    process.exit(1);
+  }
+});
+
+// Manejar cierre graceful
+process.on('SIGTERM', () => {
+  console.log('⚠️ SIGTERM recibido, cerrando servidor...');
+  server.close(() => {
+    console.log('✅ Servidor cerrado correctamente');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('\n⚠️ SIGINT recibido (Ctrl+C), cerrando servidor...');
+  server.close(() => {
+    console.log('✅ Servidor cerrado correctamente');
+    process.exit(0);
+  });
 });
