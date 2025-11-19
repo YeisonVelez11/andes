@@ -27,9 +27,14 @@ module.exports = {
       out_file: './logs/server-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      // Número máximo de reinicios en 1 minuto antes de dejar la app como errored
-      max_restarts: 10,
-      min_uptime: '10s'
+      // Configuración de reinicio más conservadora
+      max_restarts: 5,
+      min_uptime: '5s',
+      restart_delay: 3000, // Esperar 3 segundos entre reinicios
+      kill_timeout: 5000, // Esperar 5 segundos antes de forzar kill
+      listen_timeout: 10000, // Esperar 10 segundos para que el servidor escuche
+      // No reiniciar si hay error de puerto ocupado
+      exp_backoff_restart_delay: 100
     }
   ]
 };
