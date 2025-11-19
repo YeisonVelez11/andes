@@ -85,6 +85,6 @@ module.exports = {
   deleteFile,
   getFolderInfo,
   getStorageInfo,
-  findFileById: localStorageModule.findFileById,
+  findFileById: storageBackend.findFileById,
   isLocalMode: () => true
 };

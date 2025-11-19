@@ -436,6 +436,7 @@ module.exports = {
   readFileFromLocal,
   deleteFileFromLocal,
   getFolderInfo,
+  findFileById,
   BASE_DIR,
   CONFIG_DIR
 };
