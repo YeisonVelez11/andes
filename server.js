@@ -700,9 +700,9 @@ app.get("/local-files/:fileId", async (req, res) => {
 
 
 /**
- * Convierte URLs de imágenes locales a rutas de archivo para uso en Puppeteer
+ * Convierte URLs de imágenes locales a base64 para uso en Puppeteer
  * @param {Object} jsonData - Datos JSON con URLs de imágenes
- * @returns {Promise<Object>} Objeto con las mismas claves pero valores como file:// URLs
+ * @returns {Promise<Object>} Objeto con las mismas claves pero valores como data:image URLs base64
  */
 async function convertImagesToFilePaths(jsonData) {
   if (!jsonData) return null;
@@ -717,15 +717,27 @@ async function convertImagesToFilePaths(jsonData) {
         const match = jsonData[key].match(/\/image\/([a-f0-9]+)/);
         if (match) {
           const fileId = match[1];
-          console.log(`🔄 Resolviendo ruta de ${key} (${fileId})...`);
+          console.log(`🔄 Convirtiendo ${key} a base64 (${fileId})...`);
           
           // Buscar el archivo en el sistema
           const filePath = await storageAdapter.findFileById(fileId);
           
           if (filePath) {
-            // Convertir a file:// URL para Puppeteer
-            result[key] = `file://${filePath}`;
-            console.log(`✅ ${key} → ${filePath}`);
+            // Leer el archivo y convertirlo a base64
+            const fileBuffer = fs.readFileSync(filePath);
+            
+            // Detectar el tipo MIME basado en la extensión
+            const ext = path.extname(filePath).toLowerCase();
+            let mimeType = 'image/png'; // default
+            if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+            else if (ext === '.gif') mimeType = 'image/gif';
+            else if (ext === '.webp') mimeType = 'image/webp';
+            else if (ext === '.svg') mimeType = 'image/svg+xml';
+            
+            // Convertir a data URL base64
+            const base64 = fileBuffer.toString('base64');
+            result[key] = `data:${mimeType};base64,${base64}`;
+            console.log(`✅ ${key} → base64 (${mimeType}, ${Math.round(base64.length / 1024)}KB)`);
           } else {
             console.error(`❌ Archivo no encontrado para ${key} (${fileId})`);
             result[key] = jsonData[key];

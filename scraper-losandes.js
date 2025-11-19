@@ -335,7 +335,6 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                         const targetElement = document.querySelector('.simple-news-column-without-image.simple-news-column-without-image--with-title');
                         
                         const imgLateral = document.createElement('img');
-                        imgLateral.crossOrigin = 'anonymous';
                         imgLateral.src = data.imagenLateral;
                         imgLateral.style.position = 'absolute';
                         imgLateral.style.left = (refRect.right + 25 + window.scrollX) + 'px';
@@ -386,7 +385,6 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                             results.ancho.refRect = rowRect;
                             
                             const imgAncho = document.createElement('img');
-                            imgAncho.crossOrigin = 'anonymous';
                             imgAncho.src = data.imagenAncho;
                             imgAncho.style.position = 'absolute';
                             imgAncho.style.top = (rowRect.bottom + 30 + window.scrollY) + 'px';
@@ -585,7 +583,6 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                     // Insertar imagen top si existe
                     if (data.imagenTop) {
                         const imgTop = document.createElement('img');
-                        imgTop.crossOrigin = 'anonymous';
                         imgTop.src = data.imagenTop;
                         imgTop.style.position = 'fixed'; // Usar fixed para que no se vea afectada por el margin del body
                         imgTop.style.left = '50%';
@@ -703,7 +700,6 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                         // Insertar imagen ITT centrada si existe
                         if (data.itt) {
                             const imgITT = document.createElement('img');
-                            imgITT.crossOrigin = 'anonymous';
                             imgITT.src = data.itt;
                             imgITT.style.maxWidth = '100%';
                             imgITT.style.maxHeight = '100%';
@@ -992,7 +988,6 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                         // Insertar imagen ITT centrada si existe
                         if (data.itt) {
                             const imgITT = document.createElement('img');
-                            imgITT.crossOrigin = 'anonymous';
                             imgITT.src = data.itt;
                             imgITT.style.maxWidth = '100%';
                             imgITT.style.maxHeight = '100%';
