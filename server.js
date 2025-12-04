@@ -9,6 +9,15 @@ const { getArgentinaDateString, getArgentinaISOString } = require("./date-utils"
 const { navigateWithStrategies } = require("./navigation-strategies");
 const storageAdapter = require("./storage-adapter");
 
+// Manejo global de errores para evitar que el proceso se caiga por excepciones no controladas
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("🚨 Unhandled Rejection en Promise:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("🚨 Uncaught Exception no manejada:", error);
+});
+
 const HTML_CAPTURE_USER_AGENTS = {
   desktop:
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
