@@ -832,18 +832,59 @@ async function captureAndSaveHTML() {
 
     try {
       console.log("🌐 Descargando HTML vía HTTP (sin Puppeteer)...");
-      const userAgent =
+      let finalHtml = "";
+
+      // Primer intento con user agent específico del dispositivo
+      const primaryUserAgent =
         HTML_CAPTURE_USER_AGENTS[deviceType] || HTML_CAPTURE_USER_AGENTS.desktop;
 
-      const response = await axios.get(url, {
-        headers: {
-          "User-Agent": userAgent,
-          "ngrok-skip-browser-warning": "true",
-        },
-        timeout: 30000,
-      });
+      try {
+        const primaryResponse = await axios.get(url, {
+          headers: {
+            "User-Agent": primaryUserAgent,
+            "ngrok-skip-browser-warning": "true",
+          },
+          timeout: 30000,
+        });
 
-      const html = typeof response.data === "string" ? response.data : String(response.data || "");
+        finalHtml =
+          typeof primaryResponse.data === "string"
+            ? primaryResponse.data
+            : String(primaryResponse.data || "");
+      } catch (primaryError) {
+        console.error(
+          `❌ Error capturando HTML ${deviceType} con UA primario:`,
+          primaryError.message
+        );
+
+        // Fallback: si es mobile, reintentar una vez con user agent de desktop
+        if (deviceType === "mobile") {
+          console.log(
+            "🔁 Fallback: reintentando captura HTML mobile con user agent de desktop..."
+          );
+          const fallbackUserAgent = HTML_CAPTURE_USER_AGENTS.desktop;
+
+          const fallbackResponse = await axios.get(url, {
+            headers: {
+              "User-Agent": fallbackUserAgent,
+              "ngrok-skip-browser-warning": "true",
+            },
+            timeout: 30000,
+          });
+
+          finalHtml =
+            typeof fallbackResponse.data === "string"
+              ? fallbackResponse.data
+              : String(fallbackResponse.data || "");
+        } else {
+          throw primaryError;
+        }
+      }
+
+      const html = finalHtml;
+      if (!html) {
+        throw new Error("HTML vacío devuelto por el servidor");
+      }
       console.log(`✅ HTML obtenido (${html.length} caracteres)`);
 
       const htmlBuffer = Buffer.from(html, "utf-8");
