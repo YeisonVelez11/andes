@@ -36,8 +36,11 @@ const ALTERNATIVE_USER_AGENTS = [
  * @returns {Promise<void>}
  */
 async function navigateWithStrategies(page, url, attempt, maxRetries) {
-  const strategy = NAVIGATION_STRATEGIES[attempt - 1];
-  console.log(`📡 Intento ${attempt}/${maxRetries} - Estrategia: ${strategy.name}`);
+  // Proteger por si attempt supera la cantidad de estrategias disponibles
+  const index = Math.min(Math.max(attempt - 1, 0), NAVIGATION_STRATEGIES.length - 1);
+  const strategy = NAVIGATION_STRATEGIES[index];
+  const strategyName = strategy.name || `${strategy.waitUntil} (${strategy.timeout/1000}s)`;
+  console.log(`📡 Intento ${attempt}/${maxRetries} - Estrategia: ${strategyName}`);
   
   // Cambiar user agent en intentos posteriores
   if (attempt > 1 && ALTERNATIVE_USER_AGENTS[attempt - 1]) {

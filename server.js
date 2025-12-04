@@ -3,11 +3,18 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const cors = require("cors");
+const axios = require("axios");
 const { scrapeLosAndes } = require("./scraper-losandes");
-const { launchBrowser, configurePage } = require("./puppeteer-config");
 const { getArgentinaDateString, getArgentinaISOString } = require("./date-utils");
 const { navigateWithStrategies } = require("./navigation-strategies");
 const storageAdapter = require("./storage-adapter");
+
+const HTML_CAPTURE_USER_AGENTS = {
+  desktop:
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  mobile:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+};
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -823,51 +830,22 @@ async function captureAndSaveHTML() {
     );
     console.log(`📄 Archivo: ${fileName}`);
 
-    let browser;
     try {
-      console.log("🔧 Lanzando navegador Puppeteer...");
-      browser = await launchBrowser(deviceType);
-      console.log("✅ Navegador lanzado exitosamente");
+      console.log("🌐 Descargando HTML vía HTTP (sin Puppeteer)...");
+      const userAgent =
+        HTML_CAPTURE_USER_AGENTS[deviceType] || HTML_CAPTURE_USER_AGENTS.desktop;
 
-      console.log("📄 Creando nueva página...");
-      const page = await browser.newPage();
-      console.log("✅ Página creada");
+      const response = await axios.get(url, {
+        headers: {
+          "User-Agent": userAgent,
+          "ngrok-skip-browser-warning": "true",
+        },
+        timeout: 30000,
+      });
 
-      // Configurar página con user agent y headers
-      console.log("🔧 Configurando página...");
-      await configurePage(page, deviceType);
-      console.log("✅ Página configurada");
-
-      // Navegar a la página con reintentos y diferentes estrategias
-      console.log(`🌐 Navegando a ${url}...`);
-      const maxRetries = 5;
-      
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          await navigateWithStrategies(page, url, attempt, maxRetries);
-          console.log("✅ Página cargada exitosamente");
-          break;
-        } catch (navError) {
-          console.log(`⚠️ Intento ${attempt} falló: ${navError.message}`);
-          if (attempt < maxRetries) {
-            const waitTime = attempt * 15000; // 15s, 30s, 45s, 60s
-            console.log(`⏳ Esperando ${waitTime/1000} segundos antes de reintentar...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-          } else {
-            throw navError;
-          }
-        }
-      }
-      
-      // Esperar un poco más para contenido dinámico
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Obtener el HTML completo
-      console.log("📝 Obteniendo contenido HTML...");
-      const html = await page.content();
+      const html = typeof response.data === "string" ? response.data : String(response.data || "");
       console.log(`✅ HTML obtenido (${html.length} caracteres)`);
 
-      // Convertir HTML a buffer
       const htmlBuffer = Buffer.from(html, "utf-8");
       console.log(`💾 Buffer creado (${htmlBuffer.length} bytes)`);
 
@@ -908,31 +886,6 @@ async function captureAndSaveHTML() {
       console.error(`❌ Stack trace:`, error.stack);
       console.log(`⚠️ Continuando con el siguiente dispositivo...`);
       results[deviceType] = false;
-    } finally {
-      if (browser) {
-        console.log("🔒 Cerrando navegador...");
-        try {
-          // Intentar cerrar con timeout de 10 segundos
-          await Promise.race([
-            browser.close(),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout cerrando navegador')), 10000)
-            )
-          ]);
-          console.log("✅ Navegador cerrado");
-        } catch (closeError) {
-          console.log("⚠️ Error cerrando navegador:", closeError.message);
-          console.log("🔪 Intentando matar proceso de Chrome...");
-          try {
-            // Forzar cierre del proceso
-            const pages = await browser.pages();
-            await Promise.all(pages.map(page => page.close().catch(() => {})));
-            await browser.close().catch(() => {});
-          } catch (e) {
-            console.log("⚠️ No se pudo cerrar limpiamente, continuando...");
-          }
-        }
-      }
     }
     
     // Esperar un poco entre desktop y mobile para liberar recursos

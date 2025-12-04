@@ -5,7 +5,7 @@
 const puppeteer = require('puppeteer');
 
 // Timeouts reutilizables para Puppeteer (valores fijos)
-const BROWSER_LAUNCH_TIMEOUT = 60000;   // 60s para que Chrome arranque
+const BROWSER_LAUNCH_TIMEOUT = 90000;   // 90s para que Chrome arranque en servidor
 const BROWSER_PROTOCOL_TIMEOUT = 180000; // 180s para comandos del protocolo
 
 /**
