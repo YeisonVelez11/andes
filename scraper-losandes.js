@@ -37,16 +37,30 @@ async function navigateToLosAndes(page, attempt, maxRetries) {
 async function waitForAllImages(page, context = 'página') {
     console.log(`🖼️ Esperando a que todas las imágenes de ${context} carguen...`);
     await page.evaluate(() => {
-        return Promise.all(
-            Array.from(document.images)
-                .filter(img => !img.complete)
-                .map(img => new Promise(resolve => {
-                    img.addEventListener('load', resolve);
-                    img.addEventListener('error', resolve);
-                }))
+        const pendingImages = Array.from(document.images)
+            .filter(img => !img.complete);
+
+        if (pendingImages.length === 0) {
+            return;
+        }
+
+        const loadPromise = Promise.all(
+            pendingImages.map(img => new Promise(resolve => {
+                img.addEventListener('load', resolve, { once: true });
+                img.addEventListener('error', resolve, { once: true });
+            }))
         );
+
+        const timeoutPromise = new Promise(resolve => {
+            setTimeout(() => {
+                console.warn('⏰ Timeout esperando imágenes, continuando de todas formas...');
+                resolve();
+            }, 30000); // 30s máximo esperando imágenes
+        });
+
+        return Promise.race([loadPromise, timeoutPromise]);
     });
-    console.log(`✅ Todas las imágenes de ${context} han cargado`);
+    console.log(`✅ Finalizado el wait de imágenes para ${context}`);
 }
 
 /**
