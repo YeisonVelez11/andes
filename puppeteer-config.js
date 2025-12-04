@@ -4,6 +4,10 @@
 
 const puppeteer = require('puppeteer');
 
+// Timeouts reutilizables para Puppeteer (valores fijos)
+const BROWSER_LAUNCH_TIMEOUT = 60000;   // 60s para que Chrome arranque
+const BROWSER_PROTOCOL_TIMEOUT = 180000; // 180s para comandos del protocolo
+
 /**
  * Configuración de viewport según tipo de dispositivo
  */
@@ -61,6 +65,9 @@ async function launchBrowser(deviceType = 'desktop', options = {}) {
         ? process.env.PUPPETEER_EXECUTABLE_PATH
         : puppeteer.executablePath(),
     defaultViewport: viewportConfig,
+    // Timeouts reutilizables
+    timeout: BROWSER_LAUNCH_TIMEOUT,
+    protocolTimeout: BROWSER_PROTOCOL_TIMEOUT,
     ...options
   };
 

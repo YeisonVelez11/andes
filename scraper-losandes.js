@@ -7,6 +7,26 @@ const { getArgentinaDateTime, getArgentinaTimestamp } = require('./date-utils');
 const { navigateWithStrategies } = require('./navigation-strategies');
 const storageAdapter = require('./storage-adapter');
 
+// Timeouts reutilizables para contenido HTML y navegación a Los Andes (valores fijos)
+const HTML_CONTENT_TIMEOUT = 60000; // 60s para cargar HTML histórico
+const LIVE_PAGE_TIMEOUT = 60000;    // 60s para fallback a página en vivo
+
+/**
+ * Navega a la home de Los Andes reutilizando navigateWithStrategies
+ * y, opcionalmente, un fallback simple a page.goto con timeout reutilizable.
+ */
+async function navigateToLosAndes(page, attempt, maxRetries) {
+    try {
+        await navigateWithStrategies(page, 'https://www.losandes.com.ar/', attempt, maxRetries);
+    } catch (error) {
+        console.log(`⚠️ navigateWithStrategies falló en intento ${attempt}: ${error.message}. Intentando fallback simple...`);
+        await page.goto('https://www.losandes.com.ar/', {
+            waitUntil: 'domcontentloaded',
+            timeout: LIVE_PAGE_TIMEOUT
+        });
+    }
+}
+
 
 /**
  * Espera a que todas las imágenes de la página terminen de cargar
@@ -163,10 +183,10 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 
                 console.log(`📄 HTML descargado (${htmlContent.length} caracteres)`);
                 
-                // Cargar el HTML en la página
+                // Cargar el HTML en la página con timeout reutilizable
                 await page.setContent(htmlContent, {
                     waitUntil: 'domcontentloaded',
-                    timeout: 30000
+                    timeout: HTML_CONTENT_TIMEOUT
                 });
                 
                 // Esperar a que los estilos se apliquen
@@ -212,11 +232,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 console.error(`❌ Error cargando HTML histórico: ${htmlError.message}`);
                 console.log('🌐 Fallback: Cargando página en vivo...');
                 
-                // Fallback a página en vivo
-                await page.goto('https://www.losandes.com.ar/', {
-                    waitUntil: 'domcontentloaded',
-                    timeout: 90000
-                });
+                // Fallback a página en vivo reutilizando helper de navegación
+                await navigateToLosAndes(page, attempt, maxRetries);
                 
                 // Esperar a que las imágenes carguen en el fallback también
                 await waitForAllImages(page, 'página en vivo (fallback)');

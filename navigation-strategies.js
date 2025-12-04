@@ -5,13 +5,14 @@
 
 /**
  * Estrategias de navegación con diferentes timeouts y waitUntil
+ * BASE_NAV_TIMEOUT es una constante reutilizable interna.
  */
+const BASE_NAV_TIMEOUT = 60000; // 60s base
+
 const NAVIGATION_STRATEGIES = [
-  { waitUntil: "domcontentloaded", timeout: 90000, name: "domcontentloaded (90s)" },
-  { waitUntil: "domcontentloaded", timeout: 120000, name: "domcontentloaded (120s)" },
-  { waitUntil: "load", timeout: 120000, name: "load (120s)" },
-  { waitUntil: "networkidle0", timeout: 120000, name: "networkidle0 (120s)" },
-  { waitUntil: "domcontentloaded", timeout: 150000, name: "domcontentloaded (150s)" }
+  { waitUntil: "domcontentloaded", timeout: BASE_NAV_TIMEOUT, name: `domcontentloaded (${BASE_NAV_TIMEOUT/1000}s)` },
+  { waitUntil: "domcontentloaded", timeout: BASE_NAV_TIMEOUT * 1.5, name: `domcontentloaded (${(BASE_NAV_TIMEOUT*1.5)/1000}s)` },
+  { waitUntil: "load",           timeout: BASE_NAV_TIMEOUT * 1.5, name: `load (${(BASE_NAV_TIMEOUT*1.5)/1000}s)` }
 ];
 
 /**
