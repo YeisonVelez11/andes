@@ -33,7 +33,9 @@ async function generateScreenshots() {
       headers: {
         'Content-Type': 'application/json'
       },
-      timeout: 600000 // 10 minutos de timeout (screenshots pueden tardar)
+      // Timeout deshabilitado para permitir que el proceso de generación
+      // tarde más de 10 minutos si es necesario.
+      timeout: 0
     });
 
     const data = response.data;
