@@ -35,6 +35,11 @@ module.exports = {
       listen_timeout: 30000, // Esperar 30 segundos para que el servidor escuche
       wait_ready: false, // No esperar señal ready
       autorestart: false // DESACTIVAR auto-reinicio para debug
+    },
+    {
+      name: 'test-server',
+      script: './test/tinarg/server.js',
     }
+
   ]
 };
