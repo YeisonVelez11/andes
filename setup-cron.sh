@@ -67,6 +67,8 @@ if grep -q "generate-screenshots-today.js" "$CRON_FILE"; then
     echo -e "${YELLOW}   Eliminando cronjobs existentes...${NC}\n"
     # Eliminar líneas existentes
     sed -i.bak '/generate-screenshots-today.js/d' "$CRON_FILE"
+    sed -i.bak '/# Andes - Generación automática de screenshots/d' "$CRON_FILE"
+    sed -i.bak '/curl -s "http:\/\/127.0.0.1:3001\/take-screenshot"/d' "$CRON_FILE"
 fi
 
 # Agregar nuevos cronjobs
@@ -75,13 +77,21 @@ echo "# Andes - Generación automática de screenshots" >> "$CRON_FILE"
 if [ "$USE_NVM" = true ]; then
     # Con NVM, necesitamos cargar nvm antes de ejecutar node
     echo -e "${YELLOW}📝 Configurando cronjobs con NVM...${NC}"
-    echo "0 6 * * * export NVM_DIR=\"\$HOME/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\" && cd $CURRENT_DIR && nvm use 20 && node generate-screenshots-today.js >> logs/cron-6am.log 2>&1" >> "$CRON_FILE"
-    echo "20 15 * * * export NVM_DIR=\"\$HOME/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\" && cd $CURRENT_DIR && nvm use 20 && node generate-screenshots-today.js >> logs/cron-3pm.log 2>&1" >> "$CRON_FILE"
+    # 08:00 Argentina -> 19:00 Asia/Shanghai
+    echo "0 19 * * * export NVM_DIR=\"\$HOME/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\" && cd $CURRENT_DIR && nvm use 20 && node generate-screenshots-today.js >> logs/cron-8am-ar.log 2>&1" >> "$CRON_FILE"
+    # 15:20 Colombia -> 04:20 Asia/Shanghai
+    echo "20 4 * * * export NVM_DIR=\"\$HOME/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\" && cd $CURRENT_DIR && nvm use 20 && node generate-screenshots-today.js >> logs/cron-3pm.log 2>&1" >> "$CRON_FILE"
+    # 19:00 Colombia -> 08:00 Asia/Shanghai
+    echo "0 8 * * * export NVM_DIR=\"\$HOME/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\" && cd /opt/andes/test/tinarg && nvm use 20 && node trigger-take-screenshot.js >> logs/cron-am.log 2>&1" >> "$CRON_FILE"
 else
     # Sin NVM, usar ruta directa de Node
     echo -e "${YELLOW}📝 Configurando cronjobs con Node del sistema...${NC}"
-    echo "0 6 * * * cd $CURRENT_DIR && $NODE_PATH generate-screenshots-today.js >> logs/cron-6am.log 2>&1" >> "$CRON_FILE"
-    echo "20 15 * * * cd $CURRENT_DIR && $NODE_PATH generate-screenshots-today.js >> logs/cron-3pm.log 2>&1" >> "$CRON_FILE"
+    # 08:00 Argentina -> 19:00 Asia/Shanghai
+    echo "0 19 * * * cd $CURRENT_DIR && $NODE_PATH generate-screenshots-today.js >> logs/cron-8am-ar.log 2>&1" >> "$CRON_FILE"
+    # 15:20 Colombia -> 04:20 Asia/Shanghai
+    echo "20 4 * * * cd $CURRENT_DIR && $NODE_PATH generate-screenshots-today.js >> logs/cron-3pm.log 2>&1" >> "$CRON_FILE"
+    # 19:00 Colombia -> 08:00 Asia/Shanghai
+    echo "0 8 * * * cd /opt/andes/test/tinarg && $NODE_PATH trigger-take-screenshot.js >> logs/cron-am.log 2>&1" >> "$CRON_FILE"
 fi
 
 echo "" >> "$CRON_FILE"
