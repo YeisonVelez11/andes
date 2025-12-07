@@ -1346,8 +1346,14 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 finalScreenshot = screenshotBuffer;
             } else {
             // Generar fecha y hora en formato "Mié 22 de oct. 10:24 p.m."
-            // Si hay targetDate (fecha pasada), usar esa fecha en lugar de la actual
-            const dateToUse = targetDate ? new Date(targetDate + 'T00:00:00') : new Date();
+            // Si hay targetDate (fecha pasada), usar esa fecha en lugar de la actual.
+            // IMPORTANTE: evitar new Date(YYYY-MM-DDT00:00:00) para no depender de la zona horaria del servidor.
+            const dateToUse = targetDate
+                ? (() => {
+                    const [year, month, day] = targetDate.split('-').map(Number);
+                    return new Date(year, month - 1, day);
+                  })()
+                : new Date();
             const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
             const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
             
@@ -1466,8 +1472,14 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             
             console.log(`📏 Navegador_full (original): ${navegadorFullWidth}x${navegadorFullHeight}px`);
             
-            // Generar fecha para agregar sobre navegador_full
-            const dateToUse = targetDate ? new Date(targetDate + 'T00:00:00') : new Date();
+            // Generar fecha para agregar sobre navegador_full.
+            // Usar parseo explícito de YYYY-MM-DD para que el día no dependa de la TZ del servidor.
+            const dateToUse = targetDate
+                ? (() => {
+                    const [year, month, day] = targetDate.split('-').map(Number);
+                    return new Date(year, month - 1, day);
+                  })()
+                : new Date();
             const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
             const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
             
@@ -1551,13 +1563,14 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         // Formato: YYYY-MM-DD-HH-MM-SS-[tipo_visualizacion]-[deviceType].png
         let timestamp;
         if (targetDate) {
-            // Si hay targetDate (fecha pasada), usar esa fecha con hora actual de Argentina
+            // Si hay targetDate (fecha pasada), usar esa fecha con hora actual de Argentina.
+            // Parsear explícitamente YYYY-MM-DD para que el día no dependa de la TZ del servidor.
             const dt = getArgentinaDateTime();
-            const targetDateObj = new Date(targetDate + 'T00:00:00');
-            const year = targetDateObj.getFullYear();
-            const month = String(targetDateObj.getMonth() + 1).padStart(2, '0');
-            const day = String(targetDateObj.getDate()).padStart(2, '0');
-            timestamp = `${year}-${month}-${day}-${dt.hours}-${dt.minutes}-${dt.seconds}`;
+            const [year, month, day] = targetDate.split('-').map(Number);
+            const yearStr = String(year);
+            const monthStr = String(month).padStart(2, '0');
+            const dayStr = String(day).padStart(2, '0');
+            timestamp = `${yearStr}-${monthStr}-${dayStr}-${dt.hours}-${dt.minutes}-${dt.seconds}`;
         } else {
             // Usar timestamp completo de Argentina
             timestamp = getArgentinaTimestamp();
