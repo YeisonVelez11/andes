@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const { launchBrowser, configurePage, VIEWPORT_CONFIGS } = require('./puppeteer-config');
-const { getArgentinaDateTime, getArgentinaTimestamp } = require('./date-utils');
+const { getArgentinaDateTime, getArgentinaTimestamp, getArgentinaDateString } = require('./date-utils');
 const { navigateWithStrategies } = require('./navigation-strategies');
 const storageAdapter = require('./storage-adapter');
 
@@ -1345,15 +1345,14 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
                 console.warn('⚠️ No se encontró bar1.png, continuando sin barra...');
                 finalScreenshot = screenshotBuffer;
             } else {
-            // Generar fecha y hora en formato "Mié 22 de oct. 10:24 p.m."
-            // Si hay targetDate (fecha pasada), usar esa fecha en lugar de la actual.
-            // IMPORTANTE: evitar new Date(YYYY-MM-DDT00:00:00) para no depender de la zona horaria del servidor.
-            const dateToUse = targetDate
-                ? (() => {
-                    const [year, month, day] = targetDate.split('-').map(Number);
-                    return new Date(year, month - 1, day);
-                  })()
-                : new Date();
+            // Generar fecha para la barra.
+            // - Si hay targetDate (histórico), usar ese día.
+            // - Si no hay targetDate (día actual), usar la fecha actual en Argentina.
+            const dateToUse = (() => {
+                const dateString = targetDate || getArgentinaDateString();
+                const [year, month, day] = dateString.split('-').map(Number);
+                return new Date(year, month - 1, day);
+            })();
             const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
             const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
             
@@ -1473,13 +1472,12 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             console.log(`📏 Navegador_full (original): ${navegadorFullWidth}x${navegadorFullHeight}px`);
             
             // Generar fecha para agregar sobre navegador_full.
-            // Usar parseo explícito de YYYY-MM-DD para que el día no dependa de la TZ del servidor.
-            const dateToUse = targetDate
-                ? (() => {
-                    const [year, month, day] = targetDate.split('-').map(Number);
-                    return new Date(year, month - 1, day);
-                  })()
-                : new Date();
+            // Usar siempre una fecha basada en Argentina (targetDate histórico o día actual AR).
+            const dateToUse = (() => {
+                const dateString = targetDate || getArgentinaDateString();
+                const [year, month, day] = dateString.split('-').map(Number);
+                return new Date(year, month - 1, day);
+            })();
             const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
             const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
             
