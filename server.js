@@ -8,6 +8,7 @@ const { scrapeLosAndes } = require("./scraper-losandes");
 const { getArgentinaDateString, getArgentinaISOString } = require("./date-utils");
 const { navigateWithStrategies } = require("./navigation-strategies");
 const storageAdapter = require("./storage-adapter");
+const { insertManyCampaigns, getCampaignsByDate } = require("./mongo-campaigns");
 
 // Manejo global de errores para evitar que el proceso se caiga por excepciones no controladas
 process.on("unhandledRejection", (reason, promise) => {
@@ -28,9 +29,8 @@ const HTML_CAPTURE_USER_AGENTS = {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Carpetas de almacenamiento local
+// Carpetas de almacenamiento local (solo para archivos binarios)
 const imagenes = "imagenes_cargadas";
-const jsones = "jsones";
 const capturas = "capturas";
 
 // Inicializar almacenamiento local
@@ -97,90 +97,7 @@ function isFutureDate(dateString) {
   return dateString > todayArgentina;
 }
 
-/**
- * Busca un archivo JSON por nombre en una carpeta del almacenamiento
- * @param {string} folderId - ID de la carpeta donde buscar
- * @param {string} fileName - Nombre del archivo a buscar
- * @returns {Promise<Object|null>} Objeto con datos del archivo (id, name) o null si no existe
- */
-async function findJsonFileByName(folderId, fileName) {
-  try {
-    const result = await storageAdapter.listFiles(
-      folderId,
-      { name: fileName }
-    );
-
-    if (result.files.length > 0) {
-      return result.files[0];
-    }
-    return null;
-  } catch (error) {
-    console.error("Error buscando archivo JSON:", error.message);
-    return null;
-  }
-}
-
-/**
- * Obtiene el contenido de un archivo JSON desde el almacenamiento
- * @param {string} fileId - ID del archivo
- * @returns {Promise<Object|null>} Contenido parseado del JSON o null si falla
- */
-async function getJsonFileContent(fileId) {
-  try {
-    const result = await storageAdapter.readFile(fileId);
-    
-    // Si es un buffer, convertirlo a string y parsear
-    let content = result.data;
-    if (Buffer.isBuffer(content)) {
-      content = content.toString('utf8');
-    }
-    
-    // Si es string, parsear como JSON
-    if (typeof content === 'string') {
-      return JSON.parse(content);
-    }
-    
-    // Si ya es un objeto, retornarlo directamente
-    return content;
-  } catch (error) {
-    console.error("Error obteniendo contenido JSON:", error.message);
-    return null;
-  }
-}
-
-/**
- * Crea o actualiza un archivo JSON en el almacenamiento local
- * @param {string} folderId - ID de la carpeta de destino
- * @param {string} fileName - Nombre del archivo JSON
- * @param {Object|Array} content - Contenido a guardar (será convertido a JSON)
- * @returns {Promise<Object>} Objeto con datos del archivo creado/actualizado
- * @throws {Error} Si falla la operación
- */
-async function createOrUpdateJsonFile(folderId, fileName, content) {
-  const jsonContent = JSON.stringify(content, null, 2);
-  const buffer = Buffer.from(jsonContent, "utf-8");
-
-  // Buscar si ya existe
-  const existingFile = await findJsonFileByName(folderId, fileName);
-
-  if (existingFile) {
-    // Eliminar archivo existente
-    await storageAdapter.deleteFile(existingFile.id);
-  }
-
-  // Crear nuevo archivo (más simple que actualizar)
-  const result = await storageAdapter.uploadFile(
-    folderId,
-    fileName,
-    buffer,
-    "application/json"
-  );
-
-  return {
-    ...result,
-    action: existingFile ? "updated" : "created",
-  };
-}
+// Toda la lógica de campañas pasa a MongoDB (mongo-campaigns.js).
 
 // Middleware
 app.use(cors());
@@ -354,8 +271,8 @@ app.post("/upload", async (req, res) => {
       : null;
     const firstLastOnly = req.body.firstLastOnly === "true";
 
-    // Procesar rangos de fechas y crear/actualizar archivos JSON
-    const jsonResults = [];
+    // Procesar rangos de fechas y guardar campañas en MongoDB
+    const campaignsToInsert = [];
 
     if (dateRange1 && dateRange1.start && dateRange1.end) {
       let dates1;
@@ -369,18 +286,7 @@ app.post("/upload", async (req, res) => {
       }
       for (const date of dates1) {
         try {
-          const jsonFileName = `${date}.json`;
-          const existingFile = await findJsonFileByName(jsones, jsonFileName);
-
-          let jsonData = [];
-
-          // Si el archivo existe, obtener su contenido
-          if (existingFile) {
-            const existingContent = await getJsonFileContent(existingFile.id);
-            jsonData = Array.isArray(existingContent) ? existingContent : [];
-          }
-
-          // Crear objeto con la información de las imágenes
+          // Crear objeto con la información de las imágenes/campaña
           const imageData = {
             imagenLateral: uploadedFiles.imagenLateral
               ? `/image/${uploadedFiles.imagenLateral.fileId}`
@@ -398,7 +304,7 @@ app.post("/upload", async (req, res) => {
               ? `/image/${uploadedFiles.zocalo.fileId}`
               : null,
             deviceType: deviceType,
-            campaignDate: getArgentinaISOString(date), // Fecha de la campaña (día seleccionado)
+            campaignDate: date, // Fecha de la campaña (día seleccionado, YYYY-MM-DD)
             uploadedAt: new Date().toISOString(), // Timestamp real de cuando se subió
           };
 
@@ -426,23 +332,10 @@ app.post("/upload", async (req, res) => {
           }
           imageData.campana = campana;
 
-          // Agregar al array
-          jsonData.push(imageData);
-
-          // Crear o actualizar el archivo JSON
-          const result = await createOrUpdateJsonFile(
-            jsones,
-            jsonFileName,
-            jsonData
-          );
-          jsonResults.push({
-            date,
-            fileId: result.id,
-            action: existingFile ? "updated" : "created",
-          });
+          // Agregar al array de campañas a insertar en MongoDB
+          campaignsToInsert.push(imageData);
         } catch (error) {
           console.error(`Error procesando fecha ${date}:`, error.message);
-          jsonResults.push({ date, error: error.message });
         }
       }
     }
@@ -451,18 +344,7 @@ app.post("/upload", async (req, res) => {
       const dates2 = generateDateArray(dateRange2.start, dateRange2.end);
       for (const date of dates2) {
         try {
-          const jsonFileName = `${date}.json`;
-          const existingFile = await findJsonFileByName(jsones, jsonFileName);
-
-          let jsonData = [];
-
-          // Si el archivo existe, obtener su contenido
-          if (existingFile) {
-            const existingContent = await getJsonFileContent(existingFile.id);
-            jsonData = Array.isArray(existingContent) ? existingContent : [];
-          }
-
-          // Crear objeto con la información de las imágenes
+          // Crear objeto con la información de las imágenes/campaña
           const imageData = {
             imagenLateral: uploadedFiles.imagenLateral
               ? `/image/${uploadedFiles.imagenLateral.fileId}`
@@ -480,7 +362,7 @@ app.post("/upload", async (req, res) => {
               ? `/image/${uploadedFiles.zocalo.fileId}`
               : null,
             deviceType: deviceType,
-            campaignDate: getArgentinaISOString(date), // Fecha de la campaña (día seleccionado)
+            campaignDate: date, // Fecha de la campaña (día seleccionado, YYYY-MM-DD)
             uploadedAt: new Date().toISOString(), // Timestamp real de cuando se subió
           };
 
@@ -508,25 +390,21 @@ app.post("/upload", async (req, res) => {
           }
           imageData.campana = campana;
 
-          // Agregar al array
-          jsonData.push(imageData);
-
-          // Crear o actualizar el archivo JSON
-          const result = await createOrUpdateJsonFile(
-            jsones,
-            jsonFileName,
-            jsonData
-          );
-          jsonResults.push({
-            date,
-            fileId: result.id,
-            action: existingFile ? "updated" : "created",
-          });
+          // Agregar al array de campañas a insertar en MongoDB
+          campaignsToInsert.push(imageData);
         } catch (error) {
           console.error(`Error procesando fecha ${date}:`, error.message);
-          jsonResults.push({ date, error: error.message });
         }
       }
+    }
+
+    // Guardar todas las campañas en MongoDB
+    if (campaignsToInsert.length > 0) {
+      console.log(`💾 Guardando ${campaignsToInsert.length} campañas en MongoDB...`);
+      await insertManyCampaigns(campaignsToInsert);
+      console.log("✅ Campañas guardadas en MongoDB");
+    } else {
+      console.log("ℹ️ No se generaron campañas para guardar en MongoDB");
     }
 
     // Responder con éxito
@@ -535,7 +413,7 @@ app.post("/upload", async (req, res) => {
       message: "Imágenes subidas correctamente",
       deviceType: deviceType,
       files: uploadedFiles,
-      jsonFiles: jsonResults,
+      campaignsInserted: campaignsToInsert.length,
       uploadedAt: new Date().toISOString(),
     });
   });
@@ -584,6 +462,60 @@ app.get("/folders", async (req, res) => {
   }
 });
 
+// ============================================================
+// NUEVO ENDPOINT /campaigns - API moderna basada en MongoDB
+// Obtiene campañas por fecha o rango de fechas
+// ============================================================
+
+app.get("/campaigns", async (req, res) => {
+  try {
+    const { start, end } = req.query;
+
+    if (!start || !end) {
+      return res.status(400).json({
+        success: false,
+        error: "Parámetros 'start' y 'end' son requeridos (YYYY-MM-DD)",
+      });
+    }
+
+    const db = await require("./mongo").getDb();
+    const collection = db.collection("campaigns");
+
+    // Obtener todas las campañas en el rango [start, end]
+    const campaigns = await collection
+      .find({ campaignDate: { $gte: start, $lte: end } })
+      .sort({ campaignDate: 1, uploadedAt: 1 })
+      .toArray();
+
+    // Agrupar por fecha
+    const grouped = {};
+    for (const c of campaigns) {
+      if (!grouped[c.campaignDate]) {
+        grouped[c.campaignDate] = [];
+      }
+      grouped[c.campaignDate].push(c);
+    }
+
+    // Convertir a array de fechas
+    const dates = Object.keys(grouped).sort();
+    const result = dates.map((date) => ({
+      date,
+      campaigns: grouped[date],
+    }));
+
+    res.json({
+      success: true,
+      dates: result,
+    });
+  } catch (error) {
+    console.error("Error en /campaigns:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Error al obtener campañas",
+    });
+  }
+});
+
 // Endpoint para obtener información de una carpeta específica
 app.get("/folder-info/:folderId", async (req, res) => {
   try {
@@ -604,42 +536,7 @@ app.get("/folder-info/:folderId", async (req, res) => {
   }
 });
 
-// Endpoint para listar archivos JSON
-app.get("/json-files", async (req, res) => {
-  try {
-    const result = await storageAdapter.listFiles(jsones, { mimeType: 'application/json' });
-
-    res.json({
-      success: true,
-      files: result.files,
-    });
-  } catch (error) {
-    console.error("Error al listar archivos JSON:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Error al obtener archivos JSON",
-    });
-  }
-});
-
-// Endpoint para obtener contenido de un archivo JSON específico
-app.get("/json-file/:fileId", async (req, res) => {
-  const fileId = req.params.fileId;
-
-  try {
-    const content = await getJsonFileContent(fileId);
-    res.json({
-      success: true,
-      content: content,
-    });
-  } catch (error) {
-    console.error("Error al obtener archivo JSON:", error.message);
-    res.status(404).json({
-      success: false,
-      error: "Archivo JSON no encontrado",
-    });
-  }
-});
+// Endpoints legacy /json-files y /json-file eliminados: el frontend usa /campaigns
 
 // Endpoint para servir imágenes
 app.get("/image/:fileId", async (req, res) => {
@@ -1042,19 +939,9 @@ app.post("/generate-screenshot", async (req, res) => {
         continue;
       }
 
-      const jsonFileName = `${dateToProcess}.json`;
-      const existingFile = await findJsonFileByName(jsones, jsonFileName);
-
-      if (!existingFile) {
-        console.log(
-          `⚠️ No se encontró JSON para ${dateToProcess}, saltando...`
-        );
-        continue;
-      }
-
-      const jsonContent = await getJsonFileContent(existingFile.id);
-      const jsonData = Array.isArray(jsonContent) ? jsonContent : [];
-      const desktopRecords = jsonData.filter(
+      // Obtener campañas desde MongoDB para esta fecha
+      const campaignsForDate = await getCampaignsByDate(dateToProcess);
+      const desktopRecords = campaignsForDate.filter(
         (record) => record.deviceType === "desktop"
       );
 
@@ -1169,19 +1056,9 @@ app.post("/generate-screenshot", async (req, res) => {
         continue;
       }
 
-      const jsonFileName = `${dateToProcess}.json`;
-      const existingFile = await findJsonFileByName(jsones, jsonFileName);
-
-      if (!existingFile) {
-        console.log(
-          `⚠️ No se encontró JSON para ${dateToProcess}, saltando...`
-        );
-        continue;
-      }
-
-      const jsonContent = await getJsonFileContent(existingFile.id);
-      const jsonData = Array.isArray(jsonContent) ? jsonContent : [];
-      const mobileRecords = jsonData.filter(
+      // Obtener campañas desde MongoDB para esta fecha
+      const campaignsForDate = await getCampaignsByDate(dateToProcess);
+      const mobileRecords = campaignsForDate.filter(
         (record) => record.deviceType === "mobile"
       );
 

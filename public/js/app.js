@@ -880,38 +880,28 @@ async function loadImagesForDateRange(startDate, endDate) {
   gallery.innerHTML = '<div class="col s12 center-align"><div class="preloader-wrapper small active"><div class="spinner-layer spinner-blue-only"><div class="circle-clipper left"><div class="circle"></div></div><div class="gap-patch"><div class="circle"></div></div><div class="circle-clipper right"><div class="circle"></div></div></div></div><p>Cargando imágenes del rango...</p></div>';
   
   try {
-    // Generar todas las fechas del rango
-    const dates = generateDateArray(startDate, endDate);
-    
-    // Obtener lista de archivos JSON
-    const response = await fetch('/json-files');
+    // Llamar al nuevo endpoint /campaigns para el rango completo
+    const response = await fetch(`/campaigns?start=${startDate}&end=${endDate}`);
     const result = await response.json();
-    
+
     if (!result.success) {
-      gallery.innerHTML = '<div class="col s12 center-align"><p class="red-text">Error al buscar archivos JSON</p></div>';
+      gallery.innerHTML = '<div class="col s12 center-align"><p class="red-text">Error al buscar campañas</p></div>';
       return;
     }
-    
+
+    const datesData = result.dates || [];
+
     // Limpiar galería
     gallery.innerHTML = '';
-    
+
     let totalImages = 0;
-    
-    // Para cada fecha en el rango
-    for (const date of dates) {
-      const jsonFileName = `${date}.json`;
-      const jsonFile = result.files.find(f => f.name === jsonFileName);
-      
-      if (!jsonFile) continue;
-      
-      // Obtener el contenido del JSON
-      const contentResponse = await fetch(`/json-file/${jsonFile.id}`);
-      const contentResult = await contentResponse.json();
-      
-      if (!contentResult.success || !contentResult.content || contentResult.content.length === 0) {
-        continue;
-      }
-      
+
+    // Para cada fecha en el rango que tenga campañas
+    for (const dayData of datesData) {
+      const date = dayData.date;
+      const entries = dayData.campaigns || [];
+      if (!entries.length) continue;
+
       // Crear sección para esta fecha
       const dateSection = document.createElement('div');
       dateSection.className = 'col s12';
@@ -923,14 +913,14 @@ async function loadImagesForDateRange(startDate, endDate) {
           <i class="material-icons" style="vertical-align: middle;">date_range</i>
           ${formatDate(new Date(date + 'T00:00:00'))}
           <span class="grey-text" style="font-size: 0.9rem; font-weight: normal;">
-            (${contentResult.content.length} entrada${contentResult.content.length > 1 ? 's' : ''})
+            (${entries.length} entrada${entries.length > 1 ? 's' : ''})
           </span>
         </h5>
       `;
       dateSection.appendChild(dateDivider);
       
-      // Mostrar cada entrada del JSON
-      contentResult.content.forEach((entry, index) => {
+      // Mostrar cada campaña del día
+      entries.forEach((entry, index) => {
         const entryDiv = document.createElement('div');
         entryDiv.style.marginBottom = '20px';
         
@@ -1067,38 +1057,29 @@ async function loadImagesForDate(date) {
   gallery.innerHTML = '<div class="col s12 center-align"><div class="preloader-wrapper small active"><div class="spinner-layer spinner-blue-only"><div class="circle-clipper left"><div class="circle"></div></div><div class="gap-patch"><div class="circle"></div></div><div class="circle-clipper right"><div class="circle"></div></div></div></div><p>Cargando imágenes...</p></div>';
   
   try {
-    // Buscar el archivo JSON para esta fecha
-    const jsonFileName = `${date}.json`;
-    const response = await fetch('/json-files');
+    // Usar el nuevo endpoint /campaigns para un solo día
+    const response = await fetch(`/campaigns?start=${date}&end=${date}`);
     const result = await response.json();
     
     if (!result.success) {
-      gallery.innerHTML = '<div class="col s12 center-align"><p class="red-text">Error al buscar archivos JSON</p></div>';
+      gallery.innerHTML = '<div class="col s12 center-align"><p class="red-text">Error al buscar campañas</p></div>';
       return;
     }
     
-    // Buscar el archivo específico
-    const jsonFile = result.files.find(f => f.name === jsonFileName);
-    
-    if (!jsonFile) {
-      gallery.innerHTML = `<div class="col s12 center-align"><p class="grey-text">No hay imágenes para la fecha ${date}</p></div>`;
-      return;
-    }
-    
-    // Obtener el contenido del JSON
-    const contentResponse = await fetch(`/json-file/${jsonFile.id}`);
-    const contentResult = await contentResponse.json();
-    
-    if (!contentResult.success || !contentResult.content || contentResult.content.length === 0) {
-      gallery.innerHTML = `<div class="col s12 center-align"><p class="grey-text">No hay imágenes para la fecha ${date}</p></div>`;
+    const dayData = (result.dates || []).find(d => d.date === date);
+    if (!dayData || !dayData.campaigns || dayData.campaigns.length === 0) {
+      gallery.innerHTML = '<div class="col s12 center-align"><p class="grey-text">No se encontraron campañas para esta fecha</p></div>';
       return;
     }
     
     // Limpiar galería
     gallery.innerHTML = '';
     
+    const entries = dayData.campaigns;
+    let totalImages = 0;
+    
     // Mostrar cada entrada del JSON
-    contentResult.content.forEach((entry, index) => {
+    entries.forEach((entry, index) => {
       const entryDiv = document.createElement('div');
       entryDiv.className = 'col s12';
       entryDiv.style.marginBottom = '20px';
