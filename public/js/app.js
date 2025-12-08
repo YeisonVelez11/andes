@@ -934,11 +934,22 @@ async function loadImagesForDateRange(startDate, endDate) {
         const visualizationType = entry.tipo_visualizacion || 'No especificado';
         const visualizationName = visualizationNames[visualizationType] || visualizationType;
         
+        const displayDateText = entry.campaignDate
+          ? (() => {
+              const parts = String(entry.campaignDate).split('-');
+              if (parts.length === 3) {
+                const [year, month, day] = parts;
+                return `${day}/${month}/${year}`;
+              }
+              return entry.campaignDate;
+            })()
+          : new Date(entry.uploadedAt).toLocaleDateString();
+
         entryContent.innerHTML = `
           <span class="card-title">
             Entrada #${index + 1}
             <span class="grey-text" style="font-size: 0.9rem; font-weight: normal;">
-              (${new Date(entry.campaignDate || entry.uploadedAt).toLocaleDateString()})
+              (${displayDateText})
             </span>
             ${entry.uploadedAt ? `
               <br>
@@ -1094,11 +1105,22 @@ async function loadImagesForDate(date) {
       const visualizationType = entry.tipo_visualizacion || 'No especificado';
       const visualizationName = visualizationNames[visualizationType] || visualizationType;
       
+      const displayDateText = entry.campaignDate
+        ? (() => {
+            const parts = String(entry.campaignDate).split('-');
+            if (parts.length === 3) {
+              const [year, month, day] = parts;
+              return `${day}/${month}/${year}`;
+            }
+            return entry.campaignDate;
+          })()
+        : new Date(entry.uploadedAt).toLocaleDateString();
+
       entryContent.innerHTML = `
         <span class="card-title">
           Entrada #${index + 1}
           <span class="grey-text" style="font-size: 0.9rem; font-weight: normal;">
-            (${new Date(entry.campaignDate || entry.uploadedAt).toLocaleDateString()})
+            (${displayDateText})
           </span>
           ${entry.uploadedAt ? `
             <br>

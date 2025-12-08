@@ -66,7 +66,9 @@ async function uploadFile(folderId, fileName, buffer, mimeType) {
 }
 
 /**
- * Genera un array de fechas entre dos fechas (inclusive)
+ * Genera un array de fechas entre dos fechas (inclusive) en formato YYYY-MM-DD.
+ * IMPORTANTE: No depende de la zona horaria del servidor; opera en UTC
+ * para evitar desfasajes de un día.
  * @param {string} startDate - Fecha inicial en formato YYYY-MM-DD
  * @param {string} endDate - Fecha final en formato YYYY-MM-DD
  * @returns {string[]} Array de fechas en formato YYYY-MM-DD
@@ -76,12 +78,18 @@ async function uploadFile(folderId, fileName, buffer, mimeType) {
  */
 function generateDateArray(startDate, endDate) {
   const dates = [];
-  const currentDate = new Date(startDate);
-  const end = new Date(endDate);
 
-  while (currentDate <= end) {
-    dates.push(new Date(currentDate).toISOString().split("T")[0]);
-    currentDate.setDate(currentDate.getDate() + 1);
+  const [startYear, startMonth, startDay] = startDate.split("-").map(Number);
+  const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
+
+  // Construir fechas en UTC para que el .toISOString() mantenga el mismo día
+  let current = new Date(Date.UTC(startYear, startMonth - 1, startDay));
+  const end = new Date(Date.UTC(endYear, endMonth - 1, endDay));
+
+  while (current <= end) {
+    dates.push(current.toISOString().split("T")[0]);
+    // Sumar 1 día en UTC
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   return dates;
