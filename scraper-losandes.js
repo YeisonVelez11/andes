@@ -299,6 +299,10 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             const insElements = document.querySelectorAll('ins');
             insElements.forEach(ins => ins.remove());
             
+            // Remover bloques de transmisión en vivo
+            const liveBroadcastElements = document.querySelectorAll('.live-broadcast');
+            liveBroadcastElements.forEach(el => el.remove());
+            
             console.log('✅ Publicidades removidas');
         });
         

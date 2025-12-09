@@ -82,7 +82,9 @@ if [ "$USE_NVM" = true ]; then
     # 15:20 Colombia -> 04:20 Asia/Shanghai
     echo "20 4 * * * export NVM_DIR=\"\$HOME/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\" && cd $CURRENT_DIR && nvm use 20 && node generate-screenshots-today.js >> logs/cron-3pm.log 2>&1" >> "$CRON_FILE"
     # 19:00 Colombia -> 08:00 Asia/Shanghai
-    echo "0 8 * * * export NVM_DIR=\"\$HOME/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\" && cd /opt/andes/test/tinarg && nvm use 20 && node trigger-take-screenshot.js >> logs/cron-am.log 2>&1" >> "$CRON_FILE"
+    # Awake 3 minutos antes para calentar el entorno
+    echo "57 7 * * * export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && cd /opt/andes/test/tinarg && nvm use 20 && node awake-screenshot.js >> logs/cron-am.log 2>&1" >> "$CRON_FILE"
+    echo "0 8 * * * export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && cd /opt/andes/test/tinarg && nvm use 20 && node trigger-take-screenshot.js >> logs/cron-am.log 2>&1" >> "$CRON_FILE"
 else
     # Sin NVM, usar ruta directa de Node
     echo -e "${YELLOW}📝 Configurando cronjobs con Node del sistema...${NC}"
@@ -91,7 +93,10 @@ else
     # 15:20 Colombia -> 04:20 Asia/Shanghai
     echo "20 4 * * * cd $CURRENT_DIR && $NODE_PATH generate-screenshots-today.js >> logs/cron-3pm.log 2>&1" >> "$CRON_FILE"
     # 19:00 Colombia -> 08:00 Asia/Shanghai
+    # Awake 3 minutos antes para calentar el entorno
+    echo "57 7 * * * cd /opt/andes/test/tinarg && $NODE_PATH awake-screenshot.js >> logs/cron-am.log 2>&1" >> "$CRON_FILE"
     echo "0 8 * * * cd /opt/andes/test/tinarg && $NODE_PATH trigger-take-screenshot.js >> logs/cron-am.log 2>&1" >> "$CRON_FILE"
+
 fi
 
 echo "" >> "$CRON_FILE"
