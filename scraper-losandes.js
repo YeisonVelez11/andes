@@ -1562,7 +1562,8 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
         }
 
         // Generar nombre de archivo con timestamp en hora argentina
-        // Formato: YYYY-MM-DD-HH-MM-SS-[tipo_visualizacion]-[deviceType].png
+        // Formato original (comentado): YYYY-MM-DD-HH-MM-SS-[tipo_visualizacion]-[deviceType].png
+        // Ahora solo se usa la fecha: YYYY-MM-DD-[tipo_visualizacion]-[deviceType].png
         let timestamp;
         if (targetDate) {
             // Si hay targetDate (fecha pasada), usar esa fecha con hora actual de Argentina.
@@ -1572,12 +1573,17 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             const yearStr = String(year);
             const monthStr = String(month).padStart(2, '0');
             const dayStr = String(day).padStart(2, '0');
-            //timestamp = `${yearStr}-${monthStr}-${dayStr}-${dt.hours}-${dt.minutes}-${dt.seconds}`;
+            // Lógica anterior con hora completa:
+            // timestamp = `${yearStr}-${monthStr}-${dayStr}-${dt.hours}-${dt.minutes}-${dt.seconds}`;
+            // Nueva lógica: solo fecha
             timestamp = `${yearStr}-${monthStr}-${dayStr}`;
 
         } else {
-            // Usar timestamp completo de Argentina
-            timestamp = getArgentinaTimestamp();
+            // Lógica anterior: usar timestamp completo de Argentina
+            // timestamp = getArgentinaTimestamp();
+
+            // Nueva lógica: usar solo fecha actual en Argentina
+            timestamp = getArgentinaDateString();
         }
         
         // Agregar tipo de visualización y deviceType al nombre
