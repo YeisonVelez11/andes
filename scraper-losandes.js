@@ -1572,7 +1572,9 @@ async function scrapeLosAndes(deviceType = 'desktop', capturasFolderId, visualiz
             const yearStr = String(year);
             const monthStr = String(month).padStart(2, '0');
             const dayStr = String(day).padStart(2, '0');
-            timestamp = `${yearStr}-${monthStr}-${dayStr}-${dt.hours}-${dt.minutes}-${dt.seconds}`;
+            //timestamp = `${yearStr}-${monthStr}-${dayStr}-${dt.hours}-${dt.minutes}-${dt.seconds}`;
+            timestamp = `${yearStr}-${monthStr}-${dayStr}`;
+
         } else {
             // Usar timestamp completo de Argentina
             timestamp = getArgentinaTimestamp();
